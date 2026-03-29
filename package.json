@@ -1,0 +1,39 @@
+{
+  "name": "@kud/claude-sessions-cli",
+  "version": "1.0.0",
+  "description": "TUI session manager for Claude Code",
+  "type": "module",
+  "bin": {
+    "claude-sessions": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "dev": "tsx src/index.tsx",
+    "build": "tsup",
+    "build:watch": "tsup --watch",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "ink": "6.8.0",
+    "ink-text-input": "6.0.0",
+    "react": "19.2.4"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "@types/react": "^19.2.14",
+    "tsup": "^8.5.1",
+    "tsx": "4.21.0",
+    "typescript": "^6.0.2"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  }
+}
