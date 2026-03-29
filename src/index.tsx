@@ -482,8 +482,10 @@ const App = () => {
         if (cursor === 0) {
           setMode("new")
           setNewName("")
-        } else if (items[cursor])
-          doExit({ type: "open", dir: items[cursor]!.dir })
+        } else if (items[cursor]) {
+          const s = items[cursor]!
+          doExit({ type: s.claudeProjectDir ? "open" : "new", dir: s.dir })
+        }
       }
       if (input === "d" && cursor > 0) setMode("confirm-delete")
       if (input === "C") {
@@ -505,8 +507,10 @@ const App = () => {
           setSearch("")
           setMode("new")
           setNewName("")
-        } else if (items[cursor])
-          doExit({ type: "open", dir: items[cursor]!.dir })
+        } else if (items[cursor]) {
+          const s = items[cursor]!
+          doExit({ type: s.claudeProjectDir ? "open" : "new", dir: s.dir })
+        }
       }
       if (key.escape) {
         setSearch("")
