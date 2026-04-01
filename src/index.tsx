@@ -234,7 +234,7 @@ const deleteSession = (item: Session) => {
     } catch {}
     removeFromClaudeJson(item.dir)
   }
-  if (item.type === "chat") {
+  if (item.type === "chat" && item.dir !== HOME) {
     try {
       execSync(`trash "${item.dir}"`)
     } catch {}
@@ -680,6 +680,11 @@ const App = () => {
               <Text color="yellow" bold={sel} dimColor={!sel}>
                 {item.ago}
               </Text>
+              {item.dir === HOME && (
+                <Text color="red" dimColor={!sel}>
+                  ⚠ not recommended
+                </Text>
+              )}
             </Box>
           </React.Fragment>
         )
