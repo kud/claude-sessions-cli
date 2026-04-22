@@ -17,6 +17,7 @@ const SESSION_LABELS_FILE = join(CLAUDE_SESSIONS_DIR, "session-labels.json")
 
 const ICON_CHAT = "󰭹"
 const ICON_CODE = ""
+const ICON_SCHEDULE = "󰥔"
 
 const SEL_COLOR = "#FF8C00"
 const TABS: Tab[] = ["code", "chat", "schedule"]
@@ -24,6 +25,11 @@ const TAB_LABEL: Record<Tab, string> = {
   code: "Code",
   chat: "Chat",
   schedule: "Scheduled",
+}
+const TAB_ICON: Record<Tab, string> = {
+  code: ICON_CODE,
+  chat: ICON_CHAT,
+  schedule: ICON_SCHEDULE,
 }
 
 type Tab = "code" | "chat" | "schedule"
@@ -846,14 +852,16 @@ const App = () => {
     <Box flexDirection="column" paddingY={1} width={stdout.columns}>
       <Box paddingX={2} gap={3} marginBottom={1}>
         {TABS.map((t) => (
-          <Text
-            key={t}
-            color={tab === t ? SEL_COLOR : "gray"}
-            bold={tab === t}
-            underline={tab === t}
-          >
-            {TAB_LABEL[t]}
-          </Text>
+          <Box key={t} gap={1}>
+            <Text color={tab === t ? SEL_COLOR : "gray"}>{TAB_ICON[t]}</Text>
+            <Text
+              color={tab === t ? SEL_COLOR : "gray"}
+              bold={tab === t}
+              underline={tab === t}
+            >
+              {TAB_LABEL[t]}
+            </Text>
+          </Box>
         ))}
       </Box>
 
