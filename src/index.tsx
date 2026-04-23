@@ -21,6 +21,8 @@ const CLAUDE_JSON = join(HOME, ".claude.json")
 const CLAUDE_SESSIONS_DIR = join(HOME, ".claude-sessions")
 const CHATS_DIR = join(CLAUDE_SESSIONS_DIR, "chats")
 const SESSION_LABELS_FILE = join(CLAUDE_SESSIONS_DIR, "session-labels.json")
+const SESSION_PINS_FILE = join(CLAUDE_SESSIONS_DIR, "session-pins.json")
+const SESSION_TAGS_FILE = join(CLAUDE_SESSIONS_DIR, "session-tags.json")
 
 const ICON_CHAT = "󰭹"
 const ICON_CODE = ""
@@ -52,6 +54,8 @@ type Session = {
   sessionId?: string
   projectLabel?: string
   hasClaudeMd?: boolean
+  pinned?: boolean
+  tag?: string
 }
 
 type DisplayItem =
@@ -65,6 +69,7 @@ type DisplayItem =
       recentSession: Session
     }
   | { kind: "session"; session: Session }
+  | { kind: "tag-header"; label: string; expanded: boolean; count: number }
 
 type CleanItem = {
   label: string
@@ -173,6 +178,36 @@ const removeSessionLabel = (key: string) => {
   writeFileSync(SESSION_LABELS_FILE, JSON.stringify(labels, null, 2))
 }
 
+const loadSessionPins = (): Set<string> => {
+  try {
+    return new Set(JSON.parse(readFileSync(SESSION_PINS_FILE, "utf8")))
+  } catch {
+    return new Set()
+  }
+}
+
+const toggleSessionPin = (dir: string) => {
+  const pins = loadSessionPins()
+  if (pins.has(dir)) pins.delete(dir)
+  else pins.add(dir)
+  writeFileSync(SESSION_PINS_FILE, JSON.stringify([...pins], null, 2))
+}
+
+const loadSessionTags = (): Record<string, string> => {
+  try {
+    return JSON.parse(readFileSync(SESSION_TAGS_FILE, "utf8"))
+  } catch {
+    return {}
+  }
+}
+
+const saveSessionTag = (dir: string, tag: string) => {
+  const tags = loadSessionTags()
+  if (tag.trim()) tags[dir] = tag.trim()
+  else delete tags[dir]
+  writeFileSync(SESSION_TAGS_FILE, JSON.stringify(tags, null, 2))
+}
+
 const loadSessions = async (): Promise<Session[]> => {
   const sessions: Session[] = []
 
@@ -258,6 +293,15 @@ const loadSessions = async (): Promise<Session[]> => {
     const override =
       (s.sessionId && labelOverrides[s.sessionId]) || labelOverrides[s.dir]
     if (override) s.label = override
+  }
+
+  const pins = loadSessionPins()
+  const tagOverrides = loadSessionTags()
+  for (const s of sessions) {
+    if (s.type === "chat") {
+      s.pinned = pins.has(s.dir)
+      s.tag = tagOverrides[s.dir]
+    }
   }
 
   return sessions.sort((a, b) => b.mtime - a.mtime)
@@ -359,6 +403,7 @@ const buildDisplayItems = (
   sessions: Session[],
   search: string,
   expandedProjects: Set<string>,
+  expandedTags: Set<string>,
 ): DisplayItem[] => {
   const match = (s: Session) =>
     !search ||
@@ -367,10 +412,34 @@ const buildDisplayItems = (
 
   if (tab === "chat") {
     const filtered = sessions.filter((s) => s.type === "chat").filter(match)
-    return [
-      { kind: "new" },
-      ...filtered.map((s) => ({ kind: "session" as const, session: s })),
-    ]
+    const pinned = filtered.filter((s) => s.pinned)
+    const tagged = filtered.filter((s) => !s.pinned && s.tag)
+    const untagged = filtered.filter((s) => !s.pinned && !s.tag)
+
+    const items: DisplayItem[] = [{ kind: "new" }]
+
+    for (const s of pinned) items.push({ kind: "session", session: s })
+
+    const tagGroups = new Map<string, Session[]>()
+    for (const s of tagged) {
+      if (!tagGroups.has(s.tag!)) tagGroups.set(s.tag!, [])
+      tagGroups.get(s.tag!)!.push(s)
+    }
+    for (const [tag, group] of tagGroups) {
+      const expanded = expandedTags.has(tag)
+      items.push({
+        kind: "tag-header",
+        label: tag,
+        expanded,
+        count: group.length,
+      })
+      if (expanded)
+        for (const s of group) items.push({ kind: "session", session: s })
+    }
+
+    for (const s of untagged) items.push({ kind: "session", session: s })
+
+    return items
   }
 
   if (tab === "schedule") {
@@ -416,6 +485,12 @@ const contextHints = (item: DisplayItem | undefined): [string, string][] => {
       ["d", "delete all"],
       ["q", "quit"],
     ]
+  if (item?.kind === "tag-header")
+    return [
+      ...nav,
+      ["space", item.expanded ? "collapse" : "expand"],
+      ["q", "quit"],
+    ]
   if (item?.kind === "session") {
     const s = item.session
     const pairs: [string, string][] = [
@@ -423,7 +498,12 @@ const contextHints = (item: DisplayItem | undefined): [string, string][] => {
       ["enter", "open"],
       ["d", "delete"],
     ]
-    if (s.sessionId) pairs.push(["r", "rename"])
+    if (s.type === "chat") {
+      pairs.push(["p", s.pinned ? "unpin" : "pin"])
+      pairs.push(["t", "tag"])
+    } else if (s.sessionId) {
+      pairs.push(["r", "rename"])
+    }
     if (s.hasClaudeMd) pairs.push(["m", "md"])
     pairs.push(["q", "quit"])
     return pairs
@@ -604,6 +684,7 @@ const App = () => {
     | "search"
     | "new"
     | "rename"
+    | "tag"
     | "confirm-delete"
     | "confirm-delete-all"
     | "clean-confirm"
@@ -623,6 +704,8 @@ const App = () => {
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(
     new Set(),
   )
+  const [expandedTags, setExpandedTags] = useState<Set<string>>(new Set())
+  const [tagValue, setTagValue] = useState("")
   const [scrollOffset, setScrollOffset] = useState(0)
 
   const LOADING_MESSAGES = [
@@ -655,9 +738,15 @@ const App = () => {
   const displayItems = useMemo(
     () =>
       sessions
-        ? buildDisplayItems(tab, sessions, search, expandedProjects)
+        ? buildDisplayItems(
+            tab,
+            sessions,
+            search,
+            expandedProjects,
+            expandedTags,
+          )
         : [],
-    [sessions, tab, search, expandedProjects],
+    [sessions, tab, search, expandedProjects, expandedTags],
   )
 
   useEffect(() => {
@@ -677,6 +766,16 @@ const App = () => {
     setExpandedProjects((prev) => {
       if (prev.has(dir)) return new Set()
       return new Set([dir])
+    })
+
+  const toggleExpandTag = (tag: string) =>
+    setExpandedTags((prev) => {
+      if (prev.has(tag)) {
+        const n = new Set(prev)
+        n.delete(tag)
+        return n
+      }
+      return new Set([...prev, tag])
     })
 
   const cycleTab = (dir: 1 | -1) => {
@@ -736,6 +835,7 @@ const App = () => {
       if (input === " ") {
         const item = displayItems[cursor]
         if (item?.kind === "header") toggleExpand(item.dir)
+        if (item?.kind === "tag-header") toggleExpandTag(item.label)
       }
       if (input === "d") {
         const item = displayItems[cursor]
@@ -780,6 +880,26 @@ const App = () => {
             setPreviewScroll(0)
             setMode("preview-claude-md")
           } catch {}
+        }
+      }
+      if (input === "p") {
+        const item = displayItems[cursor]
+        if (item?.kind === "session" && item.session.type === "chat") {
+          toggleSessionPin(item.session.dir)
+          setSessions((prev) =>
+            prev
+              ? prev.map((s) =>
+                  s.dir === item.session.dir ? { ...s, pinned: !s.pinned } : s,
+                )
+              : prev,
+          )
+        }
+      }
+      if (input === "t") {
+        const item = displayItems[cursor]
+        if (item?.kind === "session" && item.session.type === "chat") {
+          setTagValue(item.session.tag ?? "")
+          setMode("tag")
         }
       }
       if (input === "C") {
@@ -868,16 +988,15 @@ const App = () => {
     (_, key) => {
       if (key.escape) setMode("list")
     },
-    { isActive: mode === "new" || mode === "rename" },
+    { isActive: mode === "new" || mode === "rename" || mode === "tag" },
   )
 
   useInput(
     (_, key) => {
-      const viewHeight = Math.max(1, (stdout.rows ?? 24) - 6)
       if (key.upArrow) setPreviewScroll((s) => Math.max(0, s - 1))
       if (key.downArrow)
         setPreviewScroll((s) =>
-          Math.min(Math.max(0, previewContent.length - viewHeight), s + 1),
+          Math.min(Math.max(0, previewContent.length - listHeight), s + 1),
         )
       if (key.escape) setMode("list")
     },
@@ -970,6 +1089,46 @@ const App = () => {
           </Box>
           <Box marginTop={1}>
             <Text dimColor>enter to save · esc to cancel</Text>
+          </Box>
+        </Box>
+      )
+    }
+
+    if (mode === "tag") {
+      const item = displayItems[cursor]
+      const session = item?.kind === "session" ? item.session : null
+      return (
+        <Box flexDirection="column" paddingX={2}>
+          <Text bold>Tag</Text>
+          {session && <Text dimColor>{session.label}</Text>}
+          <Box marginTop={1} gap={1}>
+            <Text color="cyan">›</Text>
+            <TextInput
+              value={tagValue}
+              onChange={setTagValue}
+              onSubmit={(val) => {
+                if (!session) {
+                  setMode("list")
+                  return
+                }
+                saveSessionTag(session.dir, val)
+                setSessions((prev) =>
+                  prev
+                    ? prev.map((s) =>
+                        s.dir === session.dir
+                          ? { ...s, tag: val.trim() || undefined }
+                          : s,
+                      )
+                    : prev,
+                )
+                setMode("list")
+              }}
+            />
+          </Box>
+          <Box marginTop={1}>
+            <Text dimColor>
+              enter to save · empty to remove · esc to cancel
+            </Text>
           </Box>
         </Box>
       )
@@ -1137,8 +1296,31 @@ const App = () => {
               </Box>
             )
           }
+          if (item.kind === "tag-header") {
+            return (
+              <Box key={`tag-${item.label}`} paddingLeft={2} gap={1}>
+                <Text color={sel ? "green" : "gray"}>{sel ? "›" : " "}</Text>
+                <Text color="gray">{item.expanded ? "-" : "+"}</Text>
+                <Text color={sel ? SEL_COLOR : "blue"}>#</Text>
+                <Box flexGrow={1} flexShrink={1} minWidth={0}>
+                  <Text
+                    color={sel ? SEL_COLOR : "white"}
+                    bold
+                    wrap="truncate-end"
+                  >
+                    {item.label}
+                    {item.count > 1 && (
+                      <Text
+                        color={sel ? SEL_COLOR : "gray"}
+                      >{` (${item.count})`}</Text>
+                    )}
+                  </Text>
+                </Box>
+              </Box>
+            )
+          }
           const s = item.session
-          const indent = tab === "code" ? 6 : 2
+          const indent = tab === "code" ? 6 : !s.pinned && s.tag ? 4 : 2
           return (
             <Box
               key={`${s.dir}-${s.sessionId ?? s.label}`}
@@ -1162,6 +1344,13 @@ const App = () => {
                   {s.label}
                 </Text>
               </Box>
+              {s.pinned && (
+                <Box flexShrink={0} marginRight={1}>
+                  <Text color={sel ? "yellow" : "gray"} dimColor={!sel}>
+                    ★
+                  </Text>
+                </Box>
+              )}
               {s.hasClaudeMd && (
                 <Box flexShrink={0} marginRight={1}>
                   <Text color={sel ? "cyan" : "gray"} dimColor={!sel}>
