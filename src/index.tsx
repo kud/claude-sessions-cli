@@ -1413,13 +1413,88 @@ const App = () => {
 
 mkdirSync(CHATS_DIR, { recursive: true })
 
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
+
+const runBanner = async () => {
+  const cols = process.stdout.columns ?? 80
+
+  const O = "\x1b[38;5;208m"
+  const G = "\x1b[90m"
+  const D = "\x1b[2m"
+  const R = "\x1b[0m"
+
+  const c = (text: string, vis: number) => {
+    const pad = Math.max(0, Math.floor((cols - vis) / 2))
+    return " ".repeat(pad) + text
+  }
+
+  const frames: Array<[string[], number]> = [
+    [["", "", c(`${D}${O}✻${R}`, 1), "", ""], 80],
+    [
+      [
+        "",
+        c(`${G}· · ·${R}`, 5),
+        c(`${G}· ✻ ·${R}`, 5),
+        c(`${G}· · ·${R}`, 5),
+        "",
+      ],
+      80,
+    ],
+    [
+      [
+        "",
+        c(`${G}✦ · ✦${R}`, 5),
+        c(`${G}· ${O}✻${G} ·${R}`, 5),
+        c(`${G}✦ · ✦${R}`, 5),
+        "",
+      ],
+      80,
+    ],
+    [
+      [
+        "",
+        c(`${G}· ${O}✦${G} ·${R}`, 5),
+        c(`${O}✦ · ✻ · ✦${R}`, 9),
+        c(`${G}· ${O}✦${G} ·${R}`, 5),
+        "",
+        c(`${D}claude sessions${R}`, 15),
+      ],
+      100,
+    ],
+    [
+      [
+        "",
+        c(`${G}· ${O}✦${G} ·${R}`, 5),
+        c(`${O}✦ · ✻ · ✦${R}`, 9),
+        c(`${G}· ${O}✦${G} ·${R}`, 5),
+        "",
+        c(`${O}claude sessions${R}`, 15),
+      ],
+      160,
+    ],
+  ]
+
+  for (const [lines, ms] of frames) {
+    process.stdout.write("\x1b[H\x1b[J" + lines.join("\n"))
+    await sleep(ms)
+  }
+
+  process.stdout.write("\x1b[H\x1b[J")
+}
+
 if (process.argv[2] === "clean") {
   const { waitUntilExit } = render(<CleanApp />, { exitOnCtrlC: true })
   await waitUntilExit()
 } else {
+  let firstLaunch = true
   while (true) {
     process.stdout.write("\x1b[?1049h\x1b[2J\x1b[H\x1b[?25l")
     pendingAction = null
+
+    if (firstLaunch && !process.argv.includes("--no-banner")) {
+      await runBanner()
+      firstLaunch = false
+    }
 
     const { waitUntilExit } = render(<App />, { exitOnCtrlC: true })
     await waitUntilExit()
