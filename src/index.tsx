@@ -77,6 +77,8 @@ type CleanItem = {
   execute: () => void
 }
 
+let sessionPreload: Promise<Session[]> | null = null
+
 let pendingAction: {
   type: string
   dir: string
@@ -720,7 +722,9 @@ const App = () => {
   ]
 
   useEffect(() => {
-    loadSessions().then(setSessions)
+    const p = sessionPreload ?? loadSessions()
+    sessionPreload = null
+    p.then(setSessions)
   }, [])
 
   useEffect(() => {
@@ -1496,7 +1500,28 @@ const runBanner = async () => {
     [sparkle(true), 200],
     [sparkle(false), 180],
     [sparkle(true), 180],
+    [sparkle(false), 180],
+    [sparkle(true), 180],
     [sparkle(false), 200],
+    [
+      [
+        "",
+        "",
+        c(`${G}· ${O}✻${G} ·${R}`, 5),
+        "",
+        "",
+        c(`${O}claude sessions${R}`, 15),
+      ],
+      170,
+    ],
+    [
+      ["", "", c(`${O}✻${R}`, 1), "", "", c(`${O}claude sessions${R}`, 15)],
+      160,
+    ],
+    [
+      ["", "", c(`${O}✻${R}`, 1), "", "", c(`${O}claude sessions${R}`, 15)],
+      200,
+    ],
   ]
 
   for (const [lines, ms] of frames) {
@@ -1517,6 +1542,7 @@ if (process.argv[2] === "clean") {
     pendingAction = null
 
     if (firstLaunch && !process.argv.includes("--no-banner")) {
+      sessionPreload = loadSessions()
       await runBanner()
       firstLaunch = false
     }
