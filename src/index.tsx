@@ -44,6 +44,7 @@ type Session = {
   claudeProjectDir: string
   sessionId?: string
   projectLabel?: string
+  hasClaudeMd?: boolean
 }
 
 type DisplayItem =
@@ -196,6 +197,8 @@ const loadSessions = async (): Promise<Session[]> => {
                     claudeProjectDir,
                     sessionId,
                     projectLabel,
+                    hasClaudeMd:
+                      type === "chat" && existsSync(join(cwd, "CLAUDE.md")),
                   })
                 } catch {}
               }),
@@ -224,6 +227,7 @@ const loadSessions = async (): Promise<Session[]> => {
             ago: timeAgo(mtime),
             claudeProjectDir: "",
             projectLabel: humanLabel(fullPath),
+            hasClaudeMd: existsSync(join(fullPath, "CLAUDE.md")),
           })
         } catch {}
       }
@@ -375,6 +379,47 @@ const buildDisplayItems = (
     }
   }
   return items
+}
+
+const contextHints = (item: DisplayItem | undefined): [string, string][] => {
+  const base: [string, string][] = [
+    ["↑↓", "nav"],
+    ["←→", "tab"],
+  ]
+  if (item?.kind === "new") {
+    return [
+      ...base,
+      ["enter", "new chat"],
+      ["/", "search"],
+      ["C", "clean"],
+      ["q", "quit"],
+    ]
+  }
+  if (item?.kind === "header") {
+    return [
+      ...base,
+      ["enter", "open"],
+      ["space", item.expanded ? "collapse" : "expand"],
+      ["d", "delete all"],
+      ["/", "search"],
+      ["C", "clean"],
+      ["q", "quit"],
+    ]
+  }
+  if (item?.kind === "session") {
+    const s = item.session
+    const pairs: [string, string][] = [
+      ...base,
+      ["enter", "open"],
+      ["d", "delete"],
+    ]
+    if (s.sessionId) pairs.push(["r", "rename"])
+    if (s.type === "chat") pairs.push(["f", "finder"])
+    if (s.hasClaudeMd) pairs.push(["m", "claude.md"])
+    pairs.push(["/", "search"], ["C", "clean"], ["q", "quit"])
+    return pairs
+  }
+  return [...base, ["/", "search"], ["C", "clean"], ["q", "quit"]]
 }
 
 const Hint = ({ pairs }: { pairs: [string, string][] }) => (
@@ -545,12 +590,26 @@ const App = () => {
   const [tab, setTab] = useState<Tab>(savedState.tab)
   const [cursor, setCursor] = useState(savedState.cursor)
   const [mode, setMode] = useState<
-    "list" | "search" | "new" | "rename" | "confirm-delete" | "clean-confirm"
+    | "list"
+    | "search"
+    | "new"
+    | "rename"
+    | "confirm-delete"
+    | "confirm-delete-all"
+    | "clean-confirm"
+    | "preview-claude-md"
   >("list")
   const [newName, setNewName] = useState("")
   const [renameValue, setRenameValue] = useState("")
   const [search, setSearch] = useState("")
   const [cleanItems, setCleanItems] = useState<CleanItem[] | null>(null)
+  const [deleteAllTarget, setDeleteAllTarget] = useState<{
+    dir: string
+    label: string
+    sessions: Session[]
+  } | null>(null)
+  const [previewContent, setPreviewContent] = useState<string[]>([])
+  const [previewScroll, setPreviewScroll] = useState(0)
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(
     new Set(),
   )
@@ -560,7 +619,7 @@ const App = () => {
     loadSessions().then(setSessions)
   }, [])
 
-  const CHROME_ROWS = 9
+  const CHROME_ROWS = 10
   const listHeight = Math.max(1, (stdout.rows ?? 24) - CHROME_ROWS)
 
   const displayItems = useMemo(
@@ -641,15 +700,20 @@ const App = () => {
       }
       if (input === " ") {
         const item = displayItems[cursor]
-        if (item?.kind === "header") {
-          const expanding = !expandedProjects.has(item.dir)
-          toggleExpand(item.dir)
-          if (expanding) setCursor(cursor + 1)
-        }
+        if (item?.kind === "header") toggleExpand(item.dir)
       }
       if (input === "d") {
         const item = displayItems[cursor]
         if (item?.kind === "session") setMode("confirm-delete")
+        if (item?.kind === "header") {
+          const groupSessions = sessions!.filter((s) => s.dir === item.dir)
+          setDeleteAllTarget({
+            dir: item.dir,
+            label: item.label,
+            sessions: groupSessions,
+          })
+          setMode("confirm-delete-all")
+        }
       }
       if (input === "r") {
         const item = displayItems[cursor]
@@ -665,6 +729,20 @@ const App = () => {
             ? item.session.dir
             : null
         if (dir) spawnSync("open", [dir])
+      }
+      if (input === "m") {
+        const item = displayItems[cursor]
+        if (item?.kind === "session" && item.session.hasClaudeMd) {
+          try {
+            const content = readFileSync(
+              join(item.session.dir, "CLAUDE.md"),
+              "utf8",
+            )
+            setPreviewContent(content.split("\n"))
+            setPreviewScroll(0)
+            setMode("preview-claude-md")
+          } catch {}
+        }
       }
       if (input === "C") {
         setCleanItems(null)
@@ -725,10 +803,46 @@ const App = () => {
   )
 
   useInput(
+    (input, key) => {
+      if (input === "y" && deleteAllTarget) {
+        const claudeProjectDir = deleteAllTarget.sessions[0]?.claudeProjectDir
+        for (const s of deleteAllTarget.sessions) deleteSession(s)
+        if (claudeProjectDir && existsSync(claudeProjectDir))
+          try {
+            execSync(`trash "${claudeProjectDir}"`)
+          } catch {}
+        removeFromClaudeJson(deleteAllTarget.dir)
+        setSessions((s) => s!.filter((x) => x.dir !== deleteAllTarget.dir))
+        setCursor((c) => Math.max(0, c - 1))
+        setDeleteAllTarget(null)
+        setMode("list")
+      }
+      if (input === "n" || key.escape) {
+        setDeleteAllTarget(null)
+        setMode("list")
+      }
+    },
+    { isActive: mode === "confirm-delete-all" },
+  )
+
+  useInput(
     (_, key) => {
       if (key.escape) setMode("list")
     },
     { isActive: mode === "new" || mode === "rename" },
+  )
+
+  useInput(
+    (_, key) => {
+      const viewHeight = Math.max(1, (stdout.rows ?? 24) - 6)
+      if (key.upArrow) setPreviewScroll((s) => Math.max(0, s - 1))
+      if (key.downArrow)
+        setPreviewScroll((s) =>
+          Math.min(Math.max(0, previewContent.length - viewHeight), s + 1),
+        )
+      if (key.escape) setMode("list")
+    },
+    { isActive: mode === "preview-claude-md" },
   )
 
   if (!sessions)
@@ -829,6 +943,80 @@ const App = () => {
     )
   }
 
+  if (mode === "confirm-delete-all" && deleteAllTarget) {
+    return (
+      <Box flexDirection="column" paddingX={2} paddingY={1}>
+        <Text>
+          Delete all{" "}
+          <Text color="red" bold>
+            {deleteAllTarget.sessions.length}
+          </Text>{" "}
+          sessions for{" "}
+          <Text color="red" bold>
+            {deleteAllTarget.label}
+          </Text>
+          ?
+        </Text>
+        {deleteAllTarget.sessions[0]?.sessionId && (
+          <Text dimColor>
+            session history only — project folder is untouched
+          </Text>
+        )}
+        <Box flexDirection="column" marginTop={1}>
+          {deleteAllTarget.sessions.map((s) => (
+            <Box key={s.sessionId ?? s.label} gap={1}>
+              <Text color="gray">·</Text>
+              <Box flexGrow={1} flexShrink={1} minWidth={0}>
+                <Text dimColor wrap="truncate-end">
+                  {s.label}
+                </Text>
+              </Box>
+              <Box flexShrink={0} minWidth={9} justifyContent="flex-end">
+                <Text dimColor>{s.ago}</Text>
+              </Box>
+            </Box>
+          ))}
+        </Box>
+        <Box marginTop={1}>
+          <Hint
+            pairs={[
+              ["y", "confirm"],
+              ["n / esc", "cancel"],
+            ]}
+          />
+        </Box>
+      </Box>
+    )
+  }
+
+  if (mode === "preview-claude-md") {
+    const viewHeight = Math.max(1, (stdout.rows ?? 24) - 6)
+    const visibleLines = previewContent.slice(
+      previewScroll,
+      previewScroll + viewHeight,
+    )
+    return (
+      <Box flexDirection="column" paddingX={2} paddingY={1}>
+        <Text bold>CLAUDE.md</Text>
+        <Box flexDirection="column" marginTop={1}>
+          {visibleLines.map((line, i) => (
+            <Text key={previewScroll + i} wrap="truncate-end">
+              {line || " "}
+            </Text>
+          ))}
+        </Box>
+        <Box marginTop={1}>
+          <Hint
+            pairs={[
+              ["↑↓", "scroll"],
+              ["esc", "close"],
+            ]}
+          />
+        </Box>
+      </Box>
+    )
+  }
+
   if (mode === "clean-confirm")
     return (
       <CleanConfirm
@@ -850,6 +1038,10 @@ const App = () => {
 
   return (
     <Box flexDirection="column" paddingY={1} width={stdout.columns}>
+      <Box paddingX={2} gap={1} marginBottom={1}>
+        <Text color={SEL_COLOR}>✻</Text>
+        <Text bold>Claude</Text>
+      </Box>
       <Box paddingX={2} gap={3} marginBottom={1}>
         {TABS.map((t) => (
           <Box key={t} gap={1}>
@@ -882,8 +1074,9 @@ const App = () => {
       </Box>
 
       {tab === "schedule" && displayItems.length === 0 && (
-        <Box paddingX={2} paddingY={1}>
-          <Text dimColor>no scheduled tasks yet</Text>
+        <Box paddingX={2} gap={1}>
+          <Text color="blue">i</Text>
+          <Text>no scheduled tasks yet</Text>
         </Box>
       )}
 
@@ -892,25 +1085,27 @@ const App = () => {
         const sel = i === cursor
         if (item.kind === "new") {
           return (
-            <Box key="new" paddingX={2} gap={1}>
-              <Text color={sel ? "green" : "gray"}>{sel ? "›" : " "}</Text>
-              <Text color={sel ? SEL_COLOR : "white"} bold={sel}>
-                + New chat
-              </Text>
+            <Box key="new" flexDirection="column">
+              <Box paddingX={2} gap={1}>
+                <Text color={sel ? "green" : "gray"}>{sel ? "›" : " "}</Text>
+                <Text color={sel ? SEL_COLOR : "white"} bold={sel}>
+                  + New chat
+                </Text>
+              </Box>
+              <Text> </Text>
             </Box>
           )
         }
         if (item.kind === "header") {
           return (
-            <Box key={`h-${item.dir}`} paddingX={2} gap={1}>
-              <Text color={sel ? "green" : "gray"}>
-                {item.expanded ? "-" : "+"}
-              </Text>
+            <Box key={`h-${item.dir}`} paddingLeft={2} gap={1}>
+              <Text color={sel ? "green" : "gray"}>{sel ? "›" : " "}</Text>
+              <Text color="gray">{item.expanded ? "-" : "+"}</Text>
               <Text color={sel ? SEL_COLOR : "green"}>{ICON_CODE}</Text>
               <Box flexGrow={1} flexShrink={1} minWidth={0}>
                 <Text
                   color={sel ? SEL_COLOR : "white"}
-                  bold={sel}
+                  bold
                   wrap="truncate-end"
                 >
                   {item.label}
@@ -930,27 +1125,37 @@ const App = () => {
           )
         }
         const s = item.session
-        const indent = tab === "code" ? 4 : 2
+        const indent = tab === "code" ? 6 : 2
         return (
           <Box
             key={`${s.dir}-${s.sessionId ?? s.label}`}
-            paddingX={indent}
+            paddingLeft={indent}
             gap={1}
           >
             {s.type === "chat" ? (
-              <Text color={sel ? SEL_COLOR : "magenta"}>{ICON_CHAT}</Text>
+              <>
+                <Text color={sel ? "green" : "gray"}>{sel ? "›" : " "}</Text>
+                <Text color={sel ? SEL_COLOR : "magenta"}>{ICON_CHAT}</Text>
+              </>
             ) : (
               <Text color={sel ? "green" : "gray"}>{sel ? "›" : "·"}</Text>
             )}
             <Box flexGrow={1} flexShrink={1} minWidth={0}>
               <Text
                 color={sel ? SEL_COLOR : "white"}
-                bold={sel}
+                bold={s.type === "chat"}
                 wrap="truncate-end"
               >
                 {s.label}
               </Text>
             </Box>
+            {s.hasClaudeMd && (
+              <Box flexShrink={0} marginRight={1}>
+                <Text color={sel ? "cyan" : "gray"} dimColor={!sel}>
+                  md
+                </Text>
+              </Box>
+            )}
             <Box flexShrink={0} minWidth={9} justifyContent="flex-end">
               <Text dimColor>{s.ago}</Text>
             </Box>
@@ -959,20 +1164,7 @@ const App = () => {
       })}
 
       <Box marginTop={1} paddingX={2}>
-        <Hint
-          pairs={[
-            ["↑↓", "nav"],
-            ["←→", "tab"],
-            ["enter", "open"],
-            ["space", "expand"],
-            ["/", "search"],
-            ["d", "delete"],
-            ["r", "rename"],
-            ["f", "finder"],
-            ["C", "clean"],
-            ["q", "quit"],
-          ]}
-        />
+        <Hint pairs={contextHints(displayItems[cursor])} />
       </Box>
     </Box>
   )
