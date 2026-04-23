@@ -1441,10 +1441,13 @@ const runBanner = async () => {
     c(`${O}claude sessions${R}`, 15),
   ]
 
+  const txt = (bright: boolean) =>
+    c(bright ? `${O}claude sessions${R}` : `${D}claude sessions${R}`, 15)
+
   const frames: Array<[string[], number]> = [
-    [["", "", "", "", ""], 150],
-    [["", "", c(`${D}·${R}`, 1), "", ""], 120],
-    [["", "", c(`${D}${O}✻${R}`, 1), "", ""], 100],
+    [["", "", "", "", "", txt(false)], 150],
+    [["", "", c(`${D}·${R}`, 1), "", "", txt(false)], 120],
+    [["", "", c(`${D}${O}✻${R}`, 1), "", "", txt(false)], 100],
     [
       [
         "",
@@ -1452,6 +1455,7 @@ const runBanner = async () => {
         c(`${G}· ✻ ·${R}`, 5),
         c(`${G}· · ·${R}`, 5),
         "",
+        txt(false),
       ],
       70,
     ],
@@ -1462,6 +1466,7 @@ const runBanner = async () => {
         c(`${G}· ${O}✻${G} ·${R}`, 5),
         c(`${G}✦ · ✦${R}`, 5),
         "",
+        txt(false),
       ],
       70,
     ],
@@ -1472,6 +1477,7 @@ const runBanner = async () => {
         c(`${O}✦ · ✻ · ✦${R}`, 9),
         c(`${G}· ${O}✦${G} ·${R}`, 5),
         "",
+        txt(false),
       ],
       70,
     ],
@@ -1482,7 +1488,7 @@ const runBanner = async () => {
         c(`${O}✦ · ✻ · ✦${R}`, 9),
         c(`${G}· ${O}✦${G} ·${R}`, 5),
         "",
-        c(`${D}claude sessions${R}`, 15),
+        txt(true),
       ],
       90,
     ],
@@ -1493,7 +1499,7 @@ const runBanner = async () => {
         c(`${O}✦ · ✻ · ✦${R}`, 9),
         c(`${G}· ${O}✦${G} ·${R}`, 5),
         "",
-        c(`${O}claude sessions${R}`, 15),
+        txt(true),
       ],
       130,
     ],
