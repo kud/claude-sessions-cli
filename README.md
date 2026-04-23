@@ -1,108 +1,165 @@
-# claude-sessions
+<div align="center">
 
-<p align="center">
-  <b>TUI session manager for Claude Code</b><br/>
-  Browse, open, create, and clean up your Claude sessions from a single interactive interface.
-</p>
+&nbsp;
 
-<p align="center">
-  <a href="https://www.npmjs.com/package/@kud/claude-sessions-cli"><img alt="npm version" src="https://img.shields.io/npm/v/%40kud%2Fclaude-sessions-cli?color=brightgreen" /></a>
-  <a href="https://www.npmjs.com/package/@kud/claude-sessions-cli"><img alt="downloads" src="https://img.shields.io/npm/dm/%40kud%2Fclaude-sessions-cli" /></a>
-  <a href="LICENSE"><img alt="license" src="https://img.shields.io/npm/l/%40kud%2Fclaude-sessions-cli" /></a>
-  <a href="https://nodejs.org"><img alt="node version" src="https://img.shields.io/node/v/%40kud%2Fclaude-sessions-cli" /></a>
-</p>
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D24-339933?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org/)
+[![npm](https://img.shields.io/badge/npm-%40kud%2Fclaude--sessions--cli-CB3837?style=flat-square&logo=npm&logoColor=white)](https://www.npmjs.com/package/@kud/claude-sessions-cli)
+[![MIT](https://img.shields.io/badge/licence-MIT-22C55E?style=flat-square)](LICENSE)
 
-> TL;DR: Run `claude-sessions`, pick a session, press `enter`. Claude Code opens right where you left off.
+**TUI session manager for Claude Code — browse, resume, organise, and clean up all your sessions from one interactive interface.**
+
+[Features](#-features) • [Quick Start](#-quick-start) • [CLI Reference](#-cli-reference) • [Development](#-development)
+
+</div>
 
 ---
 
-## Table of Contents
+## 🌟 Features
 
-- [Why](#why)
-- [Features](#features)
-- [Install](#install)
-- [Usage](#usage)
-- [Key Bindings](#key-bindings)
-- [Clean Mode](#clean-mode)
-- [Requirements](#requirements)
+- 🗂 **Three-tab interface** — Code sessions grouped by project, Chat sessions with pins and tag folders, and a Scheduled tab
+- ⭐ **Pin & tag chat sessions** — star important chats to the top, group others into collapsible `#tag` folders
+- 🔁 **Instant resume** — press `enter` on any session and Claude Code opens right where you left off, using the correct `--resume`, `--continue`, or `--name` flag automatically
+- 🪄 **Auto CLAUDE.md creation** — new chat sessions get a `CLAUDE.md` bootstrapped automatically; preview any session's `CLAUDE.md` in-place with `m`
+- 🧹 **Clean mode** — interactive cleanup of ghost entries, history-less projects, and orphaned history folders; available as both a key binding (`C`) and a subcommand
+- ✨ **Animated banner** — a sparkle ASCII animation plays on first launch while sessions load in the background; skip it with `--no-banner`
+- 🔍 **Live search** — filter sessions by name or path as you type with `/`
 
-## Why
+---
 
-Claude Code stores sessions per directory but gives you no way to navigate them. This tool:
+## 🚀 Quick Start
 
-- Lists all your sessions (chat + code) sorted by last activity
-- Lets you jump straight back into any session with `enter`
-- Separates chat sessions (`~/.chats/`) from code sessions (project dirs)
-- Keeps your session data clean with an interactive cleanup mode
-
-## Features
-
-| Category   | Highlights                                                          |
-| ---------- | ------------------------------------------------------------------- |
-| Navigation | Sorted by last activity, grouped by type (chat / code)              |
-| Search     | Fuzzy filter by name or path with `/`                               |
-| Filter     | Toggle between all / chat / code views with `tab`                   |
-| New chat   | Create a named chat session and open it immediately                 |
-| Delete     | Remove a session's history and directory with confirmation          |
-| Clean mode | Interactive cleanup of ghost entries, stale pointers, orphaned dirs |
-
-## Install
+Install the prerelease:
 
 ```sh
-npm install -g @kud/claude-sessions-cli
+npm install -g @kud/claude-sessions-cli@next
 ```
 
-## Usage
+Launch the TUI:
 
 ```sh
-claude-sessions         # open the TUI
-claude-sessions clean   # clean up stale session data
+claude-sessions
 ```
 
-### TUI
+You will see a brief animated banner followed by the session browser:
 
 ```
-/ search…
+  ✻ Claude
 
-  + New chat
+   Code   Chat   Scheduled
 
-── chat ────────────────────────
-▶ 󰭹  Hey         ~/.chats/hey           just now
-  󰭹  Planning    ~/.chats/planning      2h
+  / search…
 
-── code ────────────────────────
-  󰏗  my-project  ~/Projects/my-project  yesterday
-  󰏗  api         ~/Projects/api         3d
+  › + New chat
 
-↑↓ nav  enter open  d remove  / search  tab filter  C clean  q quit   [all] chat code
+  › + my-api        (3)             2h
+    + my-site        (1)         yesterday
+    + dotfiles       (2)              5d
 ```
 
-## Key Bindings
+Pick a session with `↑` / `↓` and press `enter`. Claude Code opens immediately, resuming that exact conversation.
 
-| Key         | Action                             |
-| ----------- | ---------------------------------- |
-| `↑` `↓`     | Navigate                           |
-| `enter`     | Open session in Claude Code        |
-| `d`         | Remove session (with confirmation) |
-| `/`         | Search by name or path             |
-| `tab`       | Cycle filter: all → chat → code    |
-| `C`         | Open clean mode                    |
-| `q` / `esc` | Quit                               |
+---
 
-## Clean Mode
+## 📖 CLI Reference
 
-Scans `~/.claude.json` and `~/.claude/projects/` for stale data. Issues are grouped by type — select which categories to clean before confirming. Nothing is deleted without confirmation.
+### Subcommands
+
+| Command                       | Description                                |
+| ----------------------------- | ------------------------------------------ |
+| `claude-sessions`             | Open the TUI session browser               |
+| `claude-sessions clean`       | Run the standalone clean-up wizard         |
+| `claude-sessions --no-banner` | Open the TUI, skipping the intro animation |
+
+### Tab overview
+
+| Tab           | Contents                                                                         |
+| ------------- | -------------------------------------------------------------------------------- |
+| **Code**      | Sessions from project directories, grouped by project, expand/collapse per group |
+| **Chat**      | Sessions from `~/.claude-sessions/chats/`, with pin stars and `#tag` folders     |
+| **Scheduled** | Placeholder for scheduled tasks (coming soon)                                    |
+
+### Key bindings
+
+| Key         | Context         | Action                                     |
+| ----------- | --------------- | ------------------------------------------ |
+| `↑` `↓`     | Anywhere        | Navigate the list                          |
+| `←` `→`     | Anywhere        | Switch tabs                                |
+| `tab`       | Anywhere        | Cycle to the next tab                      |
+| `enter`     | Session / group | Open or resume the session in Claude Code  |
+| `space`     | Group header    | Expand or collapse the project / tag group |
+| `d`         | Session         | Delete session (with confirmation)         |
+| `d`         | Project header  | Delete all sessions for that project       |
+| `r`         | Code session    | Rename the session label                   |
+| `p`         | Chat session    | Pin or unpin (★) the session               |
+| `t`         | Chat session    | Set or remove a `#tag` for the session     |
+| `m`         | Chat session    | Preview the session's `CLAUDE.md` inline   |
+| `f`         | Chat session    | Open the session folder in Finder          |
+| `/`         | List            | Enter search mode — filter by name or path |
+| `C`         | List            | Open clean mode                            |
+| `q` / `esc` | Anywhere        | Quit                                       |
+
+### Clean mode
+
+Scans `~/.claude.json` and `~/.claude/projects/` for stale data and groups issues by type. Select which categories to remove before confirming — nothing is deleted without an explicit `y`.
 
 | Type             | Meaning                                                                  | Action                       |
 | ---------------- | ------------------------------------------------------------------------ | ---------------------------- |
-| ghost            | Entry in `~/.claude.json` but the project directory no longer exists     | Remove from `~/.claude.json` |
-| no history       | Entry in `~/.claude.json` with no conversation history                   | Remove from `~/.claude.json` |
+| ghost            | In `~/.claude.json` but the project directory no longer exists           | Remove from `~/.claude.json` |
+| no history       | In `~/.claude.json` with no conversation history                         | Remove from `~/.claude.json` |
 | orphaned history | History in `~/.claude/projects/` with no matching `~/.claude.json` entry | Trash the history folder     |
 
-Available as both a TUI mode (`C` key) and a standalone subcommand (`claude-sessions clean`).
+Clean mode is available as the `C` key inside the TUI and as the standalone `claude-sessions clean` subcommand.
 
-## Requirements
+---
 
-- Node.js ≥ 24
-- [Claude Code](https://claude.ai/code) installed (`claude` in `PATH`)
-- [`trash`](https://github.com/sindresorhus/trash-cli) for safe deletes (`npm install -g trash-cli`)
+## 🔧 Development
+
+### Project structure
+
+```
+claude-sessions-cli/
+├── src/
+│   └── index.tsx        # entire application — TUI, banner, session logic
+├── dist/                # compiled output (generated)
+├── package.json
+└── tsup.config.ts
+```
+
+### Scripts
+
+| Script                 | Description                        |
+| ---------------------- | ---------------------------------- |
+| `npm run dev`          | Run directly from source via `tsx` |
+| `npm run build`        | Compile to `dist/` with `tsup`     |
+| `npm run build:watch`  | Watch mode compilation             |
+| `npm run typecheck`    | Type-check without emitting        |
+| `npm run clean`        | Remove `dist/`                     |
+| `npm run publish:next` | Publish to the `next` tag on npm   |
+
+### Clone and run locally
+
+```sh
+git clone git@github.com:kud/claude-sessions-cli.git
+cd claude-sessions-cli
+npm install
+npm run dev
+```
+
+---
+
+## 🏗 Tech Stack
+
+| Package          | Role                                    |
+| ---------------- | --------------------------------------- |
+| `ink`            | React renderer for the terminal         |
+| `ink-text-input` | Controlled text input component for Ink |
+| `ink-spinner`    | Spinner component for loading states    |
+| `react`          | UI component model                      |
+| `tsup`           | TypeScript bundler                      |
+| `tsx`            | Direct TypeScript execution for dev     |
+| `typescript`     | Static typing                           |
+
+---
+
+MIT © [kud](https://github.com/kud) — Made with ❤️
