@@ -1,6 +1,9 @@
 name: Publish next
 
 on:
+  push:
+    tags:
+      - "v*-next.*"
   workflow_dispatch:
 
 jobs:
