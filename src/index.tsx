@@ -1428,8 +1428,19 @@ const runBanner = async () => {
     return " ".repeat(pad) + text
   }
 
+  const sparkle = (bright: boolean) => [
+    "",
+    c(bright ? `${G}· ${O}✦${G} ·${R}` : `${G}· ✦ ·${R}`, 5),
+    c(bright ? `${O}✦ · ✻ · ✦${R}` : `${G}✦ · ${O}✻${G} · ✦${R}`, 9),
+    c(bright ? `${G}· ${O}✦${G} ·${R}` : `${G}· ✦ ·${R}`, 5),
+    "",
+    c(`${O}claude sessions${R}`, 15),
+  ]
+
   const frames: Array<[string[], number]> = [
-    [["", "", c(`${D}${O}✻${R}`, 1), "", ""], 80],
+    [["", "", "", "", ""], 150],
+    [["", "", c(`${D}·${R}`, 1), "", ""], 120],
+    [["", "", c(`${D}${O}✻${R}`, 1), "", ""], 100],
     [
       [
         "",
@@ -1438,7 +1449,7 @@ const runBanner = async () => {
         c(`${G}· · ·${R}`, 5),
         "",
       ],
-      80,
+      70,
     ],
     [
       [
@@ -1448,7 +1459,17 @@ const runBanner = async () => {
         c(`${G}✦ · ✦${R}`, 5),
         "",
       ],
-      80,
+      70,
+    ],
+    [
+      [
+        "",
+        c(`${G}· ${O}✦${G} ·${R}`, 5),
+        c(`${O}✦ · ✻ · ✦${R}`, 9),
+        c(`${G}· ${O}✦${G} ·${R}`, 5),
+        "",
+      ],
+      70,
     ],
     [
       [
@@ -1459,7 +1480,7 @@ const runBanner = async () => {
         "",
         c(`${D}claude sessions${R}`, 15),
       ],
-      100,
+      90,
     ],
     [
       [
@@ -1470,8 +1491,12 @@ const runBanner = async () => {
         "",
         c(`${O}claude sessions${R}`, 15),
       ],
-      160,
+      130,
     ],
+    [sparkle(true), 200],
+    [sparkle(false), 180],
+    [sparkle(true), 180],
+    [sparkle(false), 200],
   ]
 
   for (const [lines, ms] of frames) {
