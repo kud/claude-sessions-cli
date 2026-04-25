@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>claude-sessions — TUI session manager for Claude Code</title>
+    <meta
+      name="description"
+      content="Browse, resume, organise, and clean up all your Claude Code sessions from one interactive terminal interface."
+    />
+    <meta property="og:title" content="claude-sessions" />
+    <meta
+      property="og:description"
+      content="TUI session manager for Claude Code — browse, resume, organise, and clean up all your sessions from one interactive interface."
+    />
+    <meta
+      property="og:url"
+      content="https://kud.github.io/claude-sessions-cli"
+    />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <!-- ── Nav ─────────────────────────────────────────── -->
+    <nav id="nav">
+      <div class="nav-inner">
+        <div class="nav-brand">claude<span>-sessions</span></div>
+        <ul class="nav-links">
+          <li><a href="#features">Features</a></li>
+          <li><a href="#quickstart">Quick Start</a></li>
+          <li><a href="#reference">CLI Reference</a></li>
+          <li>
+            <a
+              href="https://github.com/kud/claude-sessions-cli"
+              target="_blank"
+              rel="noopener"
+              >GitHub</a
+            >
+          </li>
+          <li>
+            <a
+              href="https://www.npmjs.com/package/@kud/claude-sessions-cli"
+              target="_blank"
+              rel="noopener"
+              >npm</a
+            >
+          </li>
+        </ul>
+      </div>
+    </nav>
+
+    <!-- ── Hero ─────────────────────────────────────────── -->
+    <section class="hero">
+      <div class="hero-badge">v2.0.0 &nbsp;·&nbsp; CLI Tool</div>
+      <h1>Session manager for<br /><em>Claude Code</em></h1>
+      <p class="hero-desc">
+        Browse, resume, organise, and clean up all your Claude Code sessions
+        from one interactive terminal interface.
+      </p>
+      <div class="hero-actions">
+        <a class="btn-primary" href="#quickstart">Get started</a>
+        <a
+          class="btn-secondary"
+          href="https://github.com/kud/claude-sessions-cli"
+          target="_blank"
+          rel="noopener"
+          >View on GitHub</a
+        >
+      </div>
+      <div class="hero-command">
+        <span>npm install -g @kud/claude-sessions-cli@next</span>
+        <button
+          class="copy-btn"
+          data-copy="npm install -g @kud/claude-sessions-cli@next"
+        >
+          Copy
+        </button>
+      </div>
+      <div class="hero-stats">
+        <div class="hero-stat">
+          <strong>v2.0.0</strong>
+          <span>Latest</span>
+        </div>
+        <div class="hero-stat">
+          <strong>3</strong>
+          <span>Subcommands</span>
+        </div>
+        <div class="hero-stat">
+          <strong>MIT</strong>
+          <span>Licence</span>
+        </div>
+        <div class="hero-stat">
+          <strong>Node 24+</strong>
+          <span>Required</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Features ─────────────────────────────────────── -->
+    <section id="features">
+      <div class="container">
+        <span class="section-label reveal">Features</span>
+        <h2 class="section-title reveal">
+          Everything you need to<br />manage your sessions
+        </h2>
+        <p class="section-desc reveal">
+          A focused TUI that keeps your Claude Code workflow fast and organised.
+        </p>
+        <div class="features-grid">
+          <div class="feature-card reveal">
+            <span class="feature-icon">🗂</span>
+            <h3>Three-tab interface</h3>
+            <p>
+              Code sessions grouped by project, Chat sessions with pins and tag
+              folders, and a Scheduled tab — all navigable with arrow keys.
+            </p>
+          </div>
+
+          <div class="feature-card reveal">
+            <span class="feature-icon">🔁</span>
+            <h3>Instant resume</h3>
+            <p>
+              Press <code>enter</code> on any session and Claude Code opens
+              right where you left off, using the correct <code>--resume</code>,
+              <code>--continue</code>, or <code>--name</code> flag
+              automatically.
+            </p>
+          </div>
+
+          <div class="feature-card reveal">
+            <span class="feature-icon">⭐</span>
+            <h3>Pin &amp; tag chat sessions</h3>
+            <p>
+              Star important chats to the top. Group others into collapsible
+              <code>#tag</code> folders so your session list stays navigable no
+              matter how many chats you have.
+            </p>
+          </div>
+
+          <div class="feature-card reveal">
+            <span class="feature-icon">🪄</span>
+            <h3>Auto CLAUDE.md creation</h3>
+            <p>
+              New chat sessions get a <code>CLAUDE.md</code> bootstrapped
+              automatically. Preview any session's
+              <code>CLAUDE.md</code> in-place with <code>m</code> without
+              leaving the TUI.
+            </p>
+          </div>
+
+          <div class="feature-card reveal">
+            <span class="feature-icon">🧹</span>
+            <h3>Clean mode</h3>
+            <p>
+              Interactive cleanup of ghost entries, history-less projects, and
+              orphaned history folders. Available as both a key binding
+              (<code>C</code>) and the <code>clean</code> subcommand.
+            </p>
+          </div>
+
+          <div class="feature-card reveal">
+            <span class="feature-icon">🔍</span>
+            <h3>Live search</h3>
+            <p>
+              Filter sessions by name or path as you type. Press
+              <code>/</code> anywhere in the list to enter search mode — results
+              update instantly with every keystroke.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Quick Start ───────────────────────────────────── -->
+    <section id="quickstart">
+      <div class="container">
+        <span class="section-label reveal">Quick Start</span>
+        <h2 class="section-title reveal">Up and running in seconds</h2>
+        <p class="section-desc reveal">
+          Install globally from npm, then launch the TUI. No config required.
+        </p>
+
+        <div class="code-block reveal" style="margin-bottom: 1.5rem">
+          <div class="code-block-header">
+            <div class="code-dots"><span></span><span></span><span></span></div>
+            <span>Install</span>
+          </div>
+          <pre><code><span class="token-cmd">npm install -g @kud/claude-sessions-cli@next</span></code></pre>
+          <button
+            class="copy-btn"
+            data-copy="npm install -g @kud/claude-sessions-cli@next"
+          >
+            Copy
+          </button>
+        </div>
+
+        <div class="code-block reveal" style="margin-bottom: 1.5rem">
+          <div class="code-block-header">
+            <div class="code-dots"><span></span><span></span><span></span></div>
+            <span>Launch the TUI</span>
+          </div>
+          <pre><code><span class="token-cmd">claude-sessions</span></code></pre>
+          <button class="copy-btn" data-copy="claude-sessions">Copy</button>
+        </div>
+
+        <div class="code-block reveal">
+          <div class="code-block-header">
+            <div class="code-dots"><span></span><span></span><span></span></div>
+            <span>Session browser</span>
+          </div>
+          <pre><code><span class="token-output">  ✻ Claude
+
+   Code   Chat   Scheduled
+
+  / search…
+
+  › + New chat
+
+  › + my-api        (3)             2h
+    + my-site        (1)         yesterday
+    + dotfiles       (2)              5d</span>
+
+<span class="token-comment">  ↑ ↓ navigate · enter resume · / search · C clean · q quit</span></code></pre>
+        </div>
+
+        <p
+          class="section-desc reveal"
+          style="margin-top: 2rem; margin-bottom: 0"
+        >
+          Pick a session with <kbd class="kbd">↑</kbd> /
+          <kbd class="kbd">↓</kbd> and press <kbd class="kbd">enter</kbd>.
+          Claude Code opens immediately, resuming that exact conversation.
+        </p>
+      </div>
+    </section>
+
+    <!-- ── CLI Reference ─────────────────────────────────── -->
+    <section id="reference">
+      <div class="container">
+        <span class="section-label reveal">CLI Reference</span>
+        <h2 class="section-title reveal">Commands &amp; key bindings</h2>
+        <p class="section-desc reveal">
+          Every action available in the TUI and from the command line.
+        </p>
+
+        <p class="cli-section-title reveal">Subcommands</p>
+        <div class="cli-list reveal">
+          <div class="cli-row">
+            <span class="cli-key">claude-sessions</span>
+            <span class="cli-desc"
+              >Open the interactive TUI session browser</span
+            >
+          </div>
+          <div class="cli-row">
+            <span class="cli-key">claude-sessions clean</span>
+            <span class="cli-desc"
+              >Run the standalone clean-up wizard without opening the full
+              TUI</span
+            >
+          </div>
+          <div class="cli-row">
+            <span class="cli-key">claude-sessions --no-banner</span>
+            <span class="cli-desc"
+              >Open the TUI, skipping the animated intro banner</span
+            >
+          </div>
+        </div>
+
+        <p class="cli-section-title reveal">Tabs</p>
+        <div class="cli-list reveal">
+          <div class="cli-row">
+            <span class="cli-key">Code</span>
+            <span class="cli-desc"
+              >Sessions from project directories, grouped by project with
+              expand/collapse per group</span
+            >
+          </div>
+          <div class="cli-row">
+            <span class="cli-key">Chat</span>
+            <span class="cli-desc"
+              >Sessions from <code>~/.claude-sessions/chats/</code> with pin
+              stars and <code>#tag</code> folders</span
+            >
+          </div>
+          <div class="cli-row">
+            <span class="cli-key">Scheduled</span>
+            <span class="cli-desc"
+              >Placeholder for scheduled tasks (coming soon)</span
+            >
+          </div>
+        </div>
+
+        <p class="cli-section-title reveal">Key bindings</p>
+        <div class="cli-list reveal">
+          <div class="cli-row">
+            <span class="cli-key"
+              ><kbd class="kbd">↑</kbd> <kbd class="kbd">↓</kbd></span
+            >
+            <span class="cli-desc">Navigate the session list</span>
+          </div>
+          <div class="cli-row">
+            <span class="cli-key"
+              ><kbd class="kbd">←</kbd> <kbd class="kbd">→</kbd> /
+              <kbd class="kbd">tab</kbd></span
+            >
+            <span class="cli-desc">Switch tabs or cycle to the next tab</span>
+          </div>
+          <div class="cli-row">
+            <span class="cli-key"><kbd class="kbd">enter</kbd></span>
+            <span class="cli-desc"
+              >Open or resume the selected session in Claude Code</span
+            >
+          </div>
+          <div class="cli-row">
+            <span class="cli-key"><kbd class="kbd">space</kbd></span>
+            <span class="cli-desc"
+              >Expand or collapse the selected project / tag group</span
+            >
+          </div>
+          <div class="cli-row">
+            <span class="cli-key"><kbd class="kbd">d</kbd></span>
+            <span class="cli-desc"
+              >Delete session or all sessions for a project (with
+              confirmation)</span
+            >
+          </div>
+          <div class="cli-row">
+            <span class="cli-key"><kbd class="kbd">r</kbd></span>
+            <span class="cli-desc">Rename the selected Code session label</span>
+          </div>
+          <div class="cli-row">
+            <span class="cli-key"><kbd class="kbd">p</kbd></span>
+            <span class="cli-desc"
+              >Pin or unpin (★) the selected Chat session</span
+            >
+          </div>
+          <div class="cli-row">
+            <span class="cli-key"><kbd class="kbd">t</kbd></span>
+            <span class="cli-desc"
+              >Set or remove a <code>#tag</code> for the selected Chat
+              session</span
+            >
+          </div>
+          <div class="cli-row">
+            <span class="cli-key"><kbd class="kbd">m</kbd></span>
+            <span class="cli-desc"
+              >Preview the session's <code>CLAUDE.md</code> inline</span
+            >
+          </div>
+          <div class="cli-row">
+            <span class="cli-key"><kbd class="kbd">f</kbd></span>
+            <span class="cli-desc">Open the session folder in Finder</span>
+          </div>
+          <div class="cli-row">
+            <span class="cli-key"><kbd class="kbd">/</kbd></span>
+            <span class="cli-desc"
+              >Enter search mode — filter sessions by name or path as you
+              type</span
+            >
+          </div>
+          <div class="cli-row">
+            <span class="cli-key"><kbd class="kbd">C</kbd></span>
+            <span class="cli-desc"
+              >Open clean mode to remove stale entries and orphaned
+              history</span
+            >
+          </div>
+          <div class="cli-row">
+            <span class="cli-key"
+              ><kbd class="kbd">q</kbd> / <kbd class="kbd">esc</kbd></span
+            >
+            <span class="cli-desc">Quit the TUI</span>
+          </div>
+        </div>
+
+        <p class="cli-section-title reveal">Clean mode categories</p>
+        <div class="cli-list reveal">
+          <div class="cli-row">
+            <span class="cli-key">ghost</span>
+            <span class="cli-desc"
+              >In <code>~/.claude.json</code> but the project directory no
+              longer exists — removed from <code>~/.claude.json</code></span
+            >
+          </div>
+          <div class="cli-row">
+            <span class="cli-key">no history</span>
+            <span class="cli-desc"
+              >In <code>~/.claude.json</code> with no conversation history —
+              removed from <code>~/.claude.json</code></span
+            >
+          </div>
+          <div class="cli-row">
+            <span class="cli-key">orphaned history</span>
+            <span class="cli-desc"
+              >History in <code>~/.claude/projects/</code> with no matching
+              <code>~/.claude.json</code> entry — trashed</span
+            >
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Footer ────────────────────────────────────────── -->
+    <footer>
+      <div class="footer-inner">
+        <div class="footer-brand">claude<span>-sessions</span></div>
+        <div class="footer-links">
+          <a
+            href="https://github.com/kud/claude-sessions-cli"
+            target="_blank"
+            rel="noopener"
+            >GitHub</a
+          >
+          <a
+            href="https://www.npmjs.com/package/@kud/claude-sessions-cli"
+            target="_blank"
+            rel="noopener"
+            >npm</a
+          >
+          <a
+            href="https://github.com/kud/claude-sessions-cli/blob/main/CHANGELOG.md"
+            target="_blank"
+            rel="noopener"
+            >Changelog</a
+          >
+          <a
+            href="https://github.com/kud/claude-sessions-cli/blob/main/LICENSE"
+            target="_blank"
+            rel="noopener"
+            >MIT Licence</a
+          >
+        </div>
+        <p class="footer-copy">
+          MIT &copy;
+          <a href="https://github.com/kud" target="_blank" rel="noopener"
+            >kud</a
+          >
+        </p>
+      </div>
+    </footer>
+
+    <script>
+      // Nav scroll effect
+      const nav = document.getElementById("nav")
+      const onScroll = () => {
+        if (window.scrollY > 20) {
+          nav.classList.add("scrolled")
+        } else {
+          nav.classList.remove("scrolled")
+        }
+      }
+      window.addEventListener("scroll", onScroll, { passive: true })
+
+      // Copy buttons
+      document.querySelectorAll(".copy-btn[data-copy]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const text = btn.dataset.copy
+          navigator.clipboard.writeText(text).then(() => {
+            const orig = btn.textContent
+            btn.textContent = "Copied!"
+            setTimeout(() => {
+              btn.textContent = orig
+            }, 1800)
+          })
+        })
+      })
+
+      // Scroll reveal
+      const revealObserver = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add("visible")
+              revealObserver.unobserve(entry.target)
+            }
+          })
+        },
+        { threshold: 0.12 },
+      )
+      document
+        .querySelectorAll(".reveal")
+        .forEach((el) => revealObserver.observe(el))
+    </script>
+  </body>
+</html>
