@@ -3,6 +3,10 @@
   "version": "2.0.1",
   "description": "TUI session manager for Claude Code",
   "homepage": "https://kud.github.io/claude-sessions-cli",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kud/claude-sessions-cli.git"
+  },
   "license": "MIT",
   "type": "module",
   "bin": {
