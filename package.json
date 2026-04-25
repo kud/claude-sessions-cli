@@ -1,6 +1,6 @@
 {
   "name": "@kud/claude-sessions-cli",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "TUI session manager for Claude Code",
   "homepage": "https://kud.github.io/claude-sessions-cli",
   "license": "MIT",
