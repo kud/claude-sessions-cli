@@ -1,0 +1,57 @@
+---
+title: Interface
+description: The three-tab layout, navigation, and key bindings of the TUI.
+---
+
+The TUI opens to a tabbed session browser. Switch tabs with `←` / `→` or cycle
+with `tab`. Navigate the list with `↑` / `↓`, and press `enter` to open or
+resume the highlighted session.
+
+## Tabs
+
+| Tab           | Contents                                                                         |
+| ------------- | -------------------------------------------------------------------------------- |
+| **Code**      | Sessions from project directories, grouped by project, expand/collapse per group |
+| **Chat**      | Sessions from `~/.claude-sessions/chats/`, with pin stars and `#tag` folders     |
+| **Scheduled** | Placeholder for scheduled tasks (coming soon)                                    |
+
+Code sessions are read from your project history and grouped by project. Press
+`space` on a project header to expand or collapse its sessions. The Chat tab is
+covered in detail under
+[Pinning & Tagging](/projects/claude-sessions-cli/docs/pinning-and-tagging).
+
+## Resume behaviour
+
+Pressing `enter` on a session launches Claude Code with the right flag chosen
+automatically:
+
+- `--resume <id>` for an existing Code session,
+- `--continue` for the most recent conversation,
+- `--name <name>` for a named Chat session.
+
+You never have to remember which flag a session needs.
+
+## Key bindings
+
+| Key         | Context         | Action                                     |
+| ----------- | --------------- | ------------------------------------------ |
+| `↑` `↓`     | Anywhere        | Navigate the list                          |
+| `←` `→`     | Anywhere        | Switch tabs                                |
+| `tab`       | Anywhere        | Cycle to the next tab                      |
+| `enter`     | Session / group | Open or resume the session in Claude Code  |
+| `space`     | Group header    | Expand or collapse the project / tag group |
+| `d`         | Session         | Delete session (with confirmation)         |
+| `d`         | Project header  | Delete all sessions for that project       |
+| `r`         | Code session    | Rename the session label                   |
+| `p`         | Chat session    | Pin or unpin (★) the session               |
+| `t`         | Chat session    | Set or remove a `#tag` for the session     |
+| `m`         | Chat session    | Preview the session's `CLAUDE.md` inline   |
+| `f`         | Chat session    | Open the session folder in Finder          |
+| `/`         | List            | Enter search mode — filter by name or path |
+| `C`         | List            | Open clean mode                            |
+| `q` / `esc` | Anywhere        | Quit                                       |
+
+## Live search
+
+Press `/` to enter search mode and filter the visible sessions by name or path
+as you type. Press `esc` to clear the filter and return to the full list.

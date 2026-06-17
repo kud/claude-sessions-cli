@@ -1,0 +1,33 @@
+---
+title: CLI Reference
+description: Subcommands and flags for the claude-sessions binary.
+---
+
+The package installs a single `claude-sessions` binary.
+
+## Subcommands
+
+| Command                       | Description                                |
+| ----------------------------- | ------------------------------------------ |
+| `claude-sessions`             | Open the TUI session browser               |
+| `claude-sessions clean`       | Run the standalone clean-up wizard         |
+| `claude-sessions --no-banner` | Open the TUI, skipping the intro animation |
+
+## Flags
+
+| Flag          | Description                                                                   |
+| ------------- | ----------------------------------------------------------------------------- |
+| `--no-banner` | Skip the sparkle ASCII intro animation and go straight to the session browser |
+
+The intro banner plays a sparkle ASCII animation on first launch while sessions
+load in the background. Pass `--no-banner` to skip it.
+
+## Data locations
+
+| Path                                   | Purpose                                              |
+| -------------------------------------- | ---------------------------------------------------- |
+| `~/.claude-sessions/chats/`            | Chat session folders                                 |
+| `~/.claude-sessions/session-pins.json` | Pinned Chat sessions (★)                             |
+| `~/.claude-sessions/session-tags.json` | `#tag` assignments for Chat sessions                 |
+| `~/.claude.json`                       | Claude Code project registry (scanned by clean mode) |
+| `~/.claude/projects/`                  | Claude Code history folders (scanned by clean mode)  |

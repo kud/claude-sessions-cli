@@ -1,0 +1,10 @@
+{
+  "title": "claude-sessions-cli",
+  "pages": [
+    "index",
+    "interface",
+    "pinning-and-tagging",
+    "clean-mode",
+    "cli-reference"
+  ]
+}

@@ -1,0 +1,35 @@
+---
+title: Clean Mode
+description: Interactively remove ghost entries, history-less projects, and orphaned history folders.
+---
+
+Over time, `~/.claude.json` and `~/.claude/projects/` accumulate stale data —
+entries for deleted directories, projects with no conversation history, and
+orphaned history folders. Clean mode finds these and lets you remove them
+safely.
+
+## Launching
+
+Clean mode is available two ways:
+
+- Press `C` inside the TUI session browser.
+- Run the standalone subcommand:
+
+  ```sh
+  claude-sessions clean
+  ```
+
+Both scan `~/.claude.json` and `~/.claude/projects/`, group the issues found by
+type, and let you select which categories to remove. **Nothing is deleted
+without an explicit `y` confirmation.**
+
+## What it finds
+
+| Type             | Meaning                                                                  | Action                       |
+| ---------------- | ------------------------------------------------------------------------ | ---------------------------- |
+| ghost            | In `~/.claude.json` but the project directory no longer exists           | Remove from `~/.claude.json` |
+| no history       | In `~/.claude.json` with no conversation history                         | Remove from `~/.claude.json` |
+| orphaned history | History in `~/.claude/projects/` with no matching `~/.claude.json` entry | Trash the history folder     |
+
+Orphaned history folders are moved to the trash rather than permanently deleted,
+so they can be recovered if needed.
