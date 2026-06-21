@@ -106,6 +106,18 @@ const humanLabel = (dir: string) => {
 
 const kebabLabel = (dir: string) => dir.split("/").pop() || dir
 
+const windowed = <T,>(
+  arr: T[],
+  cursor: number,
+  height: number,
+): { start: number; items: T[] } => {
+  const start = Math.max(
+    0,
+    Math.min(cursor - Math.floor(height / 2), Math.max(0, arr.length - height)),
+  )
+  return { start, items: arr.slice(start, start + height) }
+}
+
 const timeAgo = (mtime: number) => {
   const diff = Date.now() / 1000 - mtime
   const m = Math.floor(diff / 60)
@@ -400,6 +412,104 @@ const deleteSession = (session: Session) => {
   }
 }
 
+const ensureClaudeJsonProject = (dir: string) => {
+  try {
+    const json = JSON.parse(readFileSync(CLAUDE_JSON, "utf8"))
+    if (!json.projects) json.projects = {}
+    if (!json.projects[dir]) {
+      json.projects[dir] = {}
+      writeFileSync(CLAUDE_JSON, JSON.stringify(json, null, 2))
+    }
+  } catch {}
+}
+
+const analyzeSessionMove = (
+  sessionId: string,
+  fromDir: string,
+): { lineCount: number; embeddedRefs: number } => {
+  try {
+    const srcPath = join(
+      CLAUDE_PROJECTS,
+      toProjectDirName(fromDir),
+      `${sessionId}.jsonl`,
+    )
+    const lines = readFileSync(srcPath, "utf8")
+      .split("\n")
+      .filter((l) => l.trim())
+    let embeddedRefs = 0
+    for (const line of lines) {
+      const occurrences = line.split(fromDir).length - 1
+      let cwd: unknown
+      try {
+        cwd = JSON.parse(line).cwd
+      } catch {}
+      embeddedRefs += Math.max(0, occurrences - (cwd === fromDir ? 1 : 0))
+    }
+    return { lineCount: lines.length, embeddedRefs }
+  } catch {
+    return { lineCount: 0, embeddedRefs: 0 }
+  }
+}
+
+const moveSession = (
+  sessionId: string,
+  fromDir: string,
+  toDir: string,
+): { ok: boolean; error?: string } => {
+  if (toDir === fromDir)
+    return { ok: false, error: "destination is the same as the source" }
+  try {
+    const fromProjectDir = join(CLAUDE_PROJECTS, toProjectDirName(fromDir))
+    const toProjectDir = join(CLAUDE_PROJECTS, toProjectDirName(toDir))
+    const srcPath = join(fromProjectDir, `${sessionId}.jsonl`)
+    const destPath = join(toProjectDir, `${sessionId}.jsonl`)
+    if (!existsSync(srcPath))
+      return { ok: false, error: "source session not found" }
+    if (existsSync(destPath))
+      return {
+        ok: false,
+        error: "a session with this id already exists at the destination",
+      }
+
+    const rewritten = readFileSync(srcPath, "utf8")
+      .split("\n")
+      .map((line) => {
+        if (!line.trim()) return line
+        try {
+          const obj = JSON.parse(line)
+          if (obj.cwd === fromDir) obj.cwd = toDir
+          return JSON.stringify(obj)
+        } catch {
+          return line
+        }
+      })
+      .join("\n")
+
+    mkdirSync(toDir, { recursive: true })
+    mkdirSync(toProjectDir, { recursive: true })
+    writeFileSync(destPath, rewritten)
+    execSync(`trash "${srcPath}"`)
+
+    ensureClaudeJsonProject(toDir)
+
+    const remaining = existsSync(fromProjectDir)
+      ? readdirSync(fromProjectDir).filter((f) => f.endsWith(".jsonl"))
+      : []
+    if (!remaining.length) {
+      removeFromClaudeJson(fromDir)
+      if (existsSync(fromProjectDir)) {
+        try {
+          execSync(`trash "${fromProjectDir}"`)
+        } catch {}
+      }
+    }
+
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
+  }
+}
+
 const buildDisplayItems = (
   tab: Tab,
   sessions: Session[],
@@ -505,6 +615,7 @@ const contextHints = (item: DisplayItem | undefined): [string, string][] => {
       pairs.push(["t", "tag"])
     } else if (s.sessionId) {
       pairs.push(["r", "rename"])
+      pairs.push(["M", "move"])
     }
     if (s.hasClaudeMd) pairs.push(["m", "md"])
     pairs.push(["q", "quit"])
@@ -691,6 +802,12 @@ const App = () => {
     | "confirm-delete-all"
     | "clean-confirm"
     | "preview-claude-md"
+    | "move-folder"
+    | "move-session"
+    | "move-dest"
+    | "move-dest-input"
+    | "move-confirm"
+    | "move-done"
   >("list")
   const [newName, setNewName] = useState("")
   const [renameValue, setRenameValue] = useState("")
@@ -709,6 +826,22 @@ const App = () => {
   const [expandedTags, setExpandedTags] = useState<Set<string>>(new Set())
   const [tagValue, setTagValue] = useState("")
   const [scrollOffset, setScrollOffset] = useState(0)
+  const [wizCursor, setWizCursor] = useState(0)
+  const [moveFromDir, setMoveFromDir] = useState<string | null>(null)
+  const [moveSessionSel, setMoveSessionSel] = useState<Session | null>(null)
+  const [moveToDir, setMoveToDir] = useState<string | null>(null)
+  const [moveDestKind, setMoveDestKind] = useState<"new-subfolder" | "other">(
+    "new-subfolder",
+  )
+  const [moveDestInput, setMoveDestInput] = useState("")
+  const [moveAnalysis, setMoveAnalysis] = useState<{
+    lineCount: number
+    embeddedRefs: number
+  } | null>(null)
+  const [moveResult, setMoveResult] = useState<{
+    ok: boolean
+    error?: string
+  } | null>(null)
 
   const LOADING_MESSAGES = [
     "Summoning your sessions…",
@@ -751,6 +884,33 @@ const App = () => {
           )
         : [],
     [sessions, tab, search, expandedProjects, expandedTags],
+  )
+
+  const moveFolders = useMemo(
+    () =>
+      sessions
+        ? [
+            ...new Set(
+              sessions.filter((s) => s.type === "code").map((s) => s.dir),
+            ),
+          ]
+        : [],
+    [sessions],
+  )
+
+  const moveSessionsList = useMemo(
+    () =>
+      sessions && moveFromDir
+        ? sessions.filter(
+            (s) => s.type === "code" && s.dir === moveFromDir && s.sessionId,
+          )
+        : [],
+    [sessions, moveFromDir],
+  )
+
+  const moveDestFolders = useMemo(
+    () => moveFolders.filter((d) => d !== moveFromDir),
+    [moveFolders, moveFromDir],
   )
 
   useEffect(() => {
@@ -911,6 +1071,14 @@ const App = () => {
         setMode("clean-confirm")
         findCleanItems().then(setCleanItems)
       }
+      if (input === "M") {
+        setMoveFromDir(null)
+        setMoveSessionSel(null)
+        setMoveToDir(null)
+        setMoveAnalysis(null)
+        setWizCursor(0)
+        setMode("move-folder")
+      }
       if (input === "q" || key.escape) exit()
     },
     { isActive: mode === "list" && !!sessions },
@@ -1005,6 +1173,110 @@ const App = () => {
       if (key.escape) setMode("list")
     },
     { isActive: mode === "preview-claude-md" },
+  )
+
+  const goToMoveConfirm = (toDir: string) => {
+    if (!moveSessionSel?.sessionId) return
+    setMoveToDir(toDir)
+    setMoveAnalysis(
+      analyzeSessionMove(moveSessionSel.sessionId, moveSessionSel.dir),
+    )
+    setMode("move-confirm")
+  }
+
+  useInput(
+    (_, key) => {
+      const length =
+        mode === "move-folder"
+          ? moveFolders.length
+          : mode === "move-session"
+            ? moveSessionsList.length
+            : moveDestFolders.length + 2
+      if (key.upArrow) setWizCursor((c) => Math.max(0, c - 1))
+      if (key.downArrow) setWizCursor((c) => Math.min(length - 1, c + 1))
+      if (key.escape) {
+        if (mode === "move-folder") setMode("list")
+        else if (mode === "move-session") {
+          setMode("move-folder")
+          setWizCursor(0)
+        } else {
+          setMode("move-session")
+          setWizCursor(0)
+        }
+      }
+      if (key.return) {
+        if (mode === "move-folder") {
+          const dir = moveFolders[wizCursor]
+          if (!dir) return
+          setMoveFromDir(dir)
+          setWizCursor(0)
+          setMode("move-session")
+        } else if (mode === "move-session") {
+          const session = moveSessionsList[wizCursor]
+          if (!session) return
+          setMoveSessionSel(session)
+          setWizCursor(0)
+          setMode("move-dest")
+        } else if (mode === "move-dest") {
+          if (wizCursor < moveDestFolders.length) {
+            const dir = moveDestFolders[wizCursor]
+            if (dir) goToMoveConfirm(dir)
+          } else {
+            setMoveDestKind(
+              wizCursor === moveDestFolders.length ? "new-subfolder" : "other",
+            )
+            setMoveDestInput("")
+            setMode("move-dest-input")
+          }
+        }
+      }
+    },
+    {
+      isActive:
+        mode === "move-folder" ||
+        mode === "move-session" ||
+        mode === "move-dest",
+    },
+  )
+
+  useInput(
+    (_, key) => {
+      if (key.escape) setMode("move-dest")
+    },
+    { isActive: mode === "move-dest-input" },
+  )
+
+  useInput(
+    (input, key) => {
+      if (input === "y" && moveSessionSel?.sessionId && moveToDir) {
+        const result = moveSession(
+          moveSessionSel.sessionId,
+          moveSessionSel.dir,
+          moveToDir,
+        )
+        setMoveResult(result)
+        if (result.ok) loadSessions().then(setSessions)
+        setMode("move-done")
+      }
+      if (input === "n" || key.escape) setMode("move-dest")
+    },
+    { isActive: mode === "move-confirm" },
+  )
+
+  useInput(
+    (_, key) => {
+      if (key.return || key.escape) {
+        setMoveResult(null)
+        setMoveFromDir(null)
+        setMoveSessionSel(null)
+        setMoveToDir(null)
+        setMoveAnalysis(null)
+        setWizCursor(0)
+        setCursor(0)
+        setMode("list")
+      }
+    },
+    { isActive: mode === "move-done" },
   )
 
   const isSearching = mode === "search"
@@ -1234,6 +1506,246 @@ const App = () => {
         </Box>
       )
     }
+
+    const moveHeader = (step: number, subtitle?: string) => (
+      <>
+        <Text bold>
+          Move session <Text dimColor>· step {step}/3</Text>
+        </Text>
+        {subtitle && (
+          <Text dimColor wrap="truncate-end">
+            {subtitle}
+          </Text>
+        )}
+      </>
+    )
+
+    if (mode === "move-folder") {
+      const { start, items } = windowed(moveFolders, wizCursor, listHeight)
+      return (
+        <Box flexDirection="column" paddingX={2}>
+          {moveHeader(1, "Pick the folder to move a session from")}
+          <Box flexDirection="column" marginTop={1}>
+            {moveFolders.length === 0 && (
+              <Text dimColor>no code sessions found</Text>
+            )}
+            {items.map((dir, vi) => {
+              const i = start + vi
+              const sel = i === wizCursor
+              return (
+                <Box key={dir} gap={1}>
+                  <Text color={sel ? "green" : "gray"}>{sel ? "›" : " "}</Text>
+                  <Text color={sel ? SEL_COLOR : "green"}>{ICON_CODE}</Text>
+                  <Box flexGrow={1} flexShrink={1} minWidth={0}>
+                    <Text color={sel ? SEL_COLOR : "white"} wrap="truncate-end">
+                      {dir.replace(HOME, "~")}
+                    </Text>
+                  </Box>
+                </Box>
+              )
+            })}
+          </Box>
+          <Box marginTop={1}>
+            <Hint
+              pairs={[
+                ["↑↓", "nav"],
+                ["enter", "select"],
+                ["esc", "cancel"],
+              ]}
+            />
+          </Box>
+        </Box>
+      )
+    }
+
+    if (mode === "move-session") {
+      const { start, items } = windowed(moveSessionsList, wizCursor, listHeight)
+      return (
+        <Box flexDirection="column" paddingX={2}>
+          {moveHeader(2, moveFromDir?.replace(HOME, "~"))}
+          <Box flexDirection="column" marginTop={1}>
+            {items.map((s, vi) => {
+              const i = start + vi
+              const sel = i === wizCursor
+              return (
+                <Box key={s.sessionId} gap={1}>
+                  <Text color={sel ? "green" : "gray"}>{sel ? "›" : "·"}</Text>
+                  <Box flexGrow={1} flexShrink={1} minWidth={0}>
+                    <Text color={sel ? SEL_COLOR : "white"} wrap="truncate-end">
+                      {s.label}
+                    </Text>
+                  </Box>
+                  <Box flexShrink={0} minWidth={9} justifyContent="flex-end">
+                    <Text dimColor>{s.ago}</Text>
+                  </Box>
+                </Box>
+              )
+            })}
+          </Box>
+          <Box marginTop={1}>
+            <Hint
+              pairs={[
+                ["↑↓", "nav"],
+                ["enter", "select"],
+                ["esc", "back"],
+              ]}
+            />
+          </Box>
+        </Box>
+      )
+    }
+
+    if (mode === "move-dest") {
+      const specials = [
+        `+ New subfolder of ${moveFromDir?.replace(HOME, "~")}`,
+        "+ Other path…",
+      ]
+      const all = [
+        ...moveDestFolders.map((d) => d.replace(HOME, "~")),
+        ...specials,
+      ]
+      const { start, items } = windowed(all, wizCursor, listHeight)
+      return (
+        <Box flexDirection="column" paddingX={2}>
+          {moveHeader(3, moveSessionSel?.label)}
+          <Box flexDirection="column" marginTop={1}>
+            {items.map((labelText, vi) => {
+              const i = start + vi
+              const sel = i === wizCursor
+              const isSpecial = i >= moveDestFolders.length
+              return (
+                <Box key={labelText} gap={1}>
+                  <Text color={sel ? "green" : "gray"}>{sel ? "›" : " "}</Text>
+                  <Box flexGrow={1} flexShrink={1} minWidth={0}>
+                    <Text
+                      color={sel ? SEL_COLOR : isSpecial ? "cyan" : "white"}
+                      wrap="truncate-end"
+                    >
+                      {labelText}
+                    </Text>
+                  </Box>
+                </Box>
+              )
+            })}
+          </Box>
+          <Box marginTop={1}>
+            <Hint
+              pairs={[
+                ["↑↓", "nav"],
+                ["enter", "select"],
+                ["esc", "back"],
+              ]}
+            />
+          </Box>
+        </Box>
+      )
+    }
+
+    if (mode === "move-dest-input") {
+      const isSub = moveDestKind === "new-subfolder"
+      return (
+        <Box flexDirection="column" paddingX={2}>
+          {moveHeader(3)}
+          <Text dimColor>
+            {isSub
+              ? `New subfolder of ${moveFromDir?.replace(HOME, "~")} (kebab-case)`
+              : "Destination path (absolute, ~ allowed)"}
+          </Text>
+          <Box marginTop={1} gap={1}>
+            <Text color="cyan">›</Text>
+            <TextInput
+              value={moveDestInput}
+              onChange={setMoveDestInput}
+              onSubmit={(val) => {
+                const trimmed = val.trim()
+                if (!trimmed || !moveFromDir) {
+                  setMode("move-dest")
+                  return
+                }
+                if (isSub) {
+                  const slug = slugify(trimmed)
+                  if (!slug) {
+                    setMode("move-dest")
+                    return
+                  }
+                  goToMoveConfirm(join(moveFromDir, slug))
+                } else {
+                  const toDir = trimmed.replace(/^~(?=$|\/)/, HOME)
+                  if (!toDir.startsWith("/")) {
+                    setMode("move-dest")
+                    return
+                  }
+                  goToMoveConfirm(toDir)
+                }
+              }}
+            />
+          </Box>
+          <Box marginTop={1}>
+            <Text dimColor>enter to continue · esc to go back</Text>
+          </Box>
+        </Box>
+      )
+    }
+
+    if (mode === "move-confirm" && moveSessionSel && moveToDir) {
+      const refs = moveAnalysis?.embeddedRefs ?? 0
+      return (
+        <Box flexDirection="column" paddingX={2}>
+          <Text>
+            Move{" "}
+            <Text color={SEL_COLOR} bold>
+              {moveSessionSel.label}
+            </Text>
+            ?
+          </Text>
+          <Box flexDirection="column" marginTop={1}>
+            <Text dimColor>from {moveSessionSel.dir.replace(HOME, "~")}</Text>
+            <Text dimColor>to {moveToDir.replace(HOME, "~")}</Text>
+          </Box>
+          <Box flexDirection="column" marginTop={1}>
+            <Text dimColor>
+              rewrites cwd on {moveAnalysis?.lineCount ?? 0} lines · updates
+              ~/.claude.json
+            </Text>
+            {refs > 0 && (
+              <Text color="yellow">
+                ⚠ {refs} embedded path reference{refs === 1 ? "" : "s"} to the
+                old folder won't be rewritten
+              </Text>
+            )}
+          </Box>
+          <Box marginTop={1}>
+            <Hint
+              pairs={[
+                ["y", "move"],
+                ["n / esc", "back"],
+              ]}
+            />
+          </Box>
+        </Box>
+      )
+    }
+
+    if (mode === "move-done")
+      return (
+        <Box flexDirection="column" paddingX={2}>
+          {moveResult?.ok ? (
+            <>
+              <Text color="green">✓ moved</Text>
+              <Text dimColor>now under {moveToDir?.replace(HOME, "~")}</Text>
+              <Text dimColor>resume it from the Code list</Text>
+            </>
+          ) : (
+            <>
+              <Text color="red">✗ move failed</Text>
+              <Text dimColor>{moveResult?.error ?? "unknown error"}</Text>
+            </>
+          )}
+          <Box marginTop={1}>
+            <Hint pairs={[["enter / esc", "back"]]} />
+          </Box>
+        </Box>
+      )
 
     if (mode === "clean-confirm")
       return (
