@@ -11,10 +11,15 @@ and clean up stale data — all without leaving your terminal.
 Built with [Ink](https://github.com/vadimdemedes/ink) (React for the terminal),
 it ships as a single `claude-sessions` binary.
 
+![preview](../assets/preview.png)
+
 ## ✨ Features
 
 - **Three-tab interface** — Code sessions grouped by project, Chat sessions with
   pins and tag folders, and a Scheduled tab.
+- **Named sessions** — sessions with a Claude title display as `name · prompt`
+  so you can tell them apart at a glance.
+- **Named filter** — press `n` on the Code tab to show only named sessions.
 - **Pin & tag chat sessions** — star important chats to the top, group others
   into collapsible `#tag` folders.
 - **Instant resume** — press `enter` on any session and Claude Code opens right
@@ -29,11 +34,8 @@ it ships as a single `claude-sessions` binary.
 ## 📦 Install
 
 ```sh
-npm install -g @kud/claude-sessions-cli@next
+npm install -g @kud/claude-sessions-cli
 ```
-
-This installs the latest prerelease from the `next` tag. For the stable
-release, use `@latest`.
 
 ## 🚀 Quick Start
 
@@ -41,22 +43,6 @@ Launch the TUI:
 
 ```sh
 claude-sessions
-```
-
-You will see a brief animated banner followed by the session browser:
-
-```
-  ✻ Claude
-
-   Code   Chat   Scheduled
-
-  / search…
-
-  › + New chat
-
-  › + my-api        (3)             2h
-    + my-site        (1)         yesterday
-    + dotfiles       (2)              5d
 ```
 
 Pick a session with `↑` / `↓` and press `enter`. Claude Code opens immediately,

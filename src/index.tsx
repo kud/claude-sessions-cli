@@ -2126,6 +2126,80 @@ const runBanner = async () => {
 if (process.argv[2] === "clean") {
   const { waitUntilExit } = render(<CleanApp />, { exitOnCtrlC: true })
   await waitUntilExit()
+} else if (process.argv.includes("--mock")) {
+  const now = Date.now() / 1000
+  const ago = (s: number) => now - s
+  const mockSessions: Session[] = [
+    // ~/Projects/todo-app — the eternal side project
+    {
+      dir: "/Users/hal/Projects/todo-app",
+      label: "todo-app — add dark mode before I write a single feature",
+      title: "todo-app",
+      prompt: "add dark mode before I write a single feature",
+      path: "~/Projects/todo-app",
+      type: "code",
+      mtime: ago(3600 * 12),
+      ago: "12h",
+      claudeProjectDir: "",
+      sessionId: "mock-0002-0000-0000-000000000001",
+      projectLabel: "todo-app",
+    },
+    {
+      dir: "/Users/hal/Projects/todo-app",
+      label: "rewrite in Go because why not",
+      path: "~/Projects/todo-app",
+      type: "code",
+      mtime: ago(3600 * 24 * 2),
+      ago: "2d",
+      claudeProjectDir: "",
+      sessionId: "mock-0002-0000-0000-000000000002",
+      projectLabel: "todo-app",
+    },
+    // ~/Projects/robot-butler — smart home chaos
+    {
+      dir: "/Users/hal/Projects/robot-butler",
+      label: "robot-butler — make my coffee maker send me passive-aggressive slack messages",
+      title: "robot-butler",
+      prompt: "make my coffee maker send me passive-aggressive slack messages",
+      path: "~/Projects/robot-butler",
+      type: "code",
+      mtime: ago(3600 * 36),
+      ago: "yesterday",
+      claudeProjectDir: "",
+      sessionId: "mock-0003-0000-0000-000000000001",
+      projectLabel: "robot-butler",
+    },
+    // ~/Projects/ai-girlfriend-for-my-terminal — don't ask
+    {
+      dir: "/Users/hal/Projects/cursed",
+      label: "is it ethical to use AI to write my apology emails",
+      path: "~/Projects/cursed",
+      type: "code",
+      mtime: ago(86400 * 3),
+      ago: "3d",
+      claudeProjectDir: "",
+      sessionId: "mock-0004-0000-0000-000000000001",
+      projectLabel: "cursed",
+    },
+    {
+      dir: "/Users/hal/Projects/cursed",
+      label: "blockchain-but-useful — find one use case, any use case",
+      title: "blockchain-but-useful",
+      prompt: "find one use case, any use case",
+      path: "~/Projects/cursed",
+      type: "code",
+      mtime: ago(86400 * 4),
+      ago: "4d",
+      claudeProjectDir: "",
+      sessionId: "mock-0004-0000-0000-000000000002",
+      projectLabel: "cursed",
+    },
+  ]
+  sessionPreload = Promise.resolve(mockSessions)
+  process.stdout.write("\x1b[?1049h\x1b[2J\x1b[H\x1b[?25l")
+  const { waitUntilExit } = render(<App />, { exitOnCtrlC: true })
+  await waitUntilExit()
+  process.stdout.write("\x1b[2J\x1b[H\x1b[?1049l\x1b[2J\x1b[H\x1b[?25h")
 } else {
   let firstLaunch = true
   while (true) {

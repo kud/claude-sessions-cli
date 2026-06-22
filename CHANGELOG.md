@@ -4,6 +4,22 @@ All notable changes to this project are documented here.
 
 ---
 
+## [Unreleased] — 2026-06-22
+
+### Added
+
+- **`--mock` flag** — run `claude-sessions --mock` to launch the TUI with a set of pre-populated fake sessions. Useful for screenshots, demos, and testing UI changes without needing real Claude history.
+- **Preview screenshot** — `assets/preview.png` added and wired into the README and docs so visitors see what the TUI looks like immediately.
+
+### Changed
+
+- **README feature list** — expanded to surface recently shipped features: named sessions (`name · prompt` display), the named-only filter (`n`), move (`M`), rename (`r`), delete (`d`), and the correct `--resume`/`--continue`/`--name` flag behaviour on resume.
+- **Install instruction simplified** — the docs no longer point to `@next`; the stable `@latest` tag is now the default install path (`npm install -g @kud/claude-sessions-cli`).
+- **Homepage updated** — `package.json` homepage now points to `kud.io/projects/claude-sessions-cli` instead of the old GitHub Pages URL.
+- **Docs quick-start trimmed** — removed the verbose ASCII-art session-browser example from the docs; the preview image replaces it with something more accurate and easier to maintain.
+
+---
+
 ## [2.2.0] — 2026-06-22
 
 ### Added

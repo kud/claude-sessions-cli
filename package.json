@@ -2,7 +2,7 @@
   "name": "@kud/claude-sessions-cli",
   "version": "2.2.0",
   "description": "TUI session manager for Claude Code",
-  "homepage": "https://kud.github.io/claude-sessions-cli",
+  "homepage": "https://kud.io/projects/claude-sessions-cli",
   "repository": {
     "type": "git",
     "url": "https://github.com/kud/claude-sessions-cli.git"
