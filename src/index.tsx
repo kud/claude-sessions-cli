@@ -42,10 +42,13 @@ const TAB_ICON: Record<Tab, string> = {
 }
 
 type Tab = "code" | "chat" | "schedule"
+type CodeFilter = "all" | "named"
 
 type Session = {
   dir: string
   label: string
+  title?: string
+  prompt?: string
   path: string
   type: "chat" | "code"
   mtime: number
@@ -147,6 +150,15 @@ const removeFromClaudeJson = (dir: string) => {
 const toProjectDirName = (absPath: string) =>
   absPath.replace(/[^a-zA-Z0-9]/g, "-")
 
+const normaliseSessionText = (value: string) =>
+  value
+    .trim()
+    .replace(/^#+\s+/, "")
+    .replace(/^[-*+]\s+(?:\[[ xX]\]\s*)?/, "")
+    .replace(/[*_`]+/g, "")
+    .replace(/\s+/g, " ")
+    .slice(0, 200)
+
 const readFirstPrompt = (filePath: string): string => {
   try {
     const content = readFileSync(filePath, "utf8")
@@ -163,12 +175,45 @@ const readFirstPrompt = (filePath: string): string => {
           !obj.message.content.startsWith("<") &&
           !obj.message.content.includes("tool_use_id")
         ) {
-          return obj.message.content.trim().replace(/\s+/g, " ").slice(0, 200)
+          return normaliseSessionText(obj.message.content)
         }
       } catch {}
     }
   } catch {}
   return ""
+}
+
+const readSessionTitle = (filePath: string): string => {
+  try {
+    const content = readFileSync(filePath, "utf8")
+    const lines = content.split("\n")
+    let title = ""
+    for (const line of lines) {
+      if (!line.trim()) continue
+      try {
+        const obj = JSON.parse(line)
+        if (obj.type !== "custom-title") continue
+        const value =
+          obj.customTitle ?? obj.sessionTitle ?? obj.title ?? obj.name
+        if (typeof value === "string" && value.trim()) {
+          title = normaliseSessionText(value)
+        }
+      } catch {}
+    }
+    return title
+  } catch {}
+  return ""
+}
+
+const buildSessionLabel = (
+  sessionTitle: string,
+  firstPrompt: string,
+  fallback: string,
+) => {
+  if (sessionTitle && firstPrompt && sessionTitle !== firstPrompt) {
+    return `${sessionTitle} — ${firstPrompt}`
+  }
+  return sessionTitle || firstPrompt || fallback
 }
 
 const loadSessionLabels = (): Record<string, string> => {
@@ -255,9 +300,13 @@ const loadSessions = async (): Promise<Session[]> => {
                   const sessionId = f.replace(".jsonl", "")
                   const firstPrompt =
                     type === "code" ? readFirstPrompt(jsonlPath) : ""
+                  const title =
+                    type === "code" ? readSessionTitle(jsonlPath) : ""
                   sessions.push({
                     dir: cwd,
-                    label: firstPrompt || projectLabel,
+                    label: buildSessionLabel(title, firstPrompt, projectLabel),
+                    title: title || undefined,
+                    prompt: firstPrompt || undefined,
                     path: shortPath,
                     type,
                     mtime,
@@ -306,7 +355,11 @@ const loadSessions = async (): Promise<Session[]> => {
   for (const s of sessions) {
     const override =
       (s.sessionId && labelOverrides[s.sessionId]) || labelOverrides[s.dir]
-    if (override) s.label = override
+    if (override) {
+      s.label = override
+      s.title = undefined
+      s.prompt = undefined
+    }
   }
 
   const pins = loadSessionPins()
@@ -516,6 +569,7 @@ const buildDisplayItems = (
   search: string,
   expandedProjects: Set<string>,
   expandedTags: Set<string>,
+  codeFilter: CodeFilter = "all",
 ): DisplayItem[] => {
   const match = (s: Session) =>
     !search ||
@@ -558,7 +612,10 @@ const buildDisplayItems = (
     return []
   }
 
-  const filtered = sessions.filter((s) => s.type === "code").filter(match)
+  const filtered = sessions
+    .filter((s) => s.type === "code")
+    .filter(match)
+    .filter((s) => codeFilter === "all" || Boolean(s.title))
   const groups = new Map<string, Session[]>()
   for (const s of filtered) {
     if (!groups.has(s.dir)) groups.set(s.dir, [])
@@ -826,6 +883,7 @@ const App = () => {
   const [expandedTags, setExpandedTags] = useState<Set<string>>(new Set())
   const [tagValue, setTagValue] = useState("")
   const [scrollOffset, setScrollOffset] = useState(0)
+  const [codeFilter, setCodeFilter] = useState<CodeFilter>("all")
   const [wizCursor, setWizCursor] = useState(0)
   const [moveFromDir, setMoveFromDir] = useState<string | null>(null)
   const [moveSessionSel, setMoveSessionSel] = useState<Session | null>(null)
@@ -881,9 +939,10 @@ const App = () => {
             search,
             expandedProjects,
             expandedTags,
+            codeFilter,
           )
         : [],
-    [sessions, tab, search, expandedProjects, expandedTags],
+    [sessions, tab, search, expandedProjects, expandedTags, codeFilter],
   )
 
   const moveFolders = useMemo(
@@ -946,6 +1005,7 @@ const App = () => {
     const next = TABS[(TABS.indexOf(tab) + dir + TABS.length) % TABS.length]!
     setTab(next)
     setSearch("")
+    setCodeFilter("all")
   }
 
   const doOpen = (session: Session) => {
@@ -1065,6 +1125,10 @@ const App = () => {
           setTagValue(item.session.tag ?? "")
           setMode("tag")
         }
+      }
+      if (input === "n" && tab === "code") {
+        setCodeFilter((f) => (f === "all" ? "named" : "all"))
+        setCursor(0)
       }
       if (input === "C") {
         setCleanItems(null)
@@ -1852,13 +1916,22 @@ const App = () => {
                 <Text color={sel ? "green" : "gray"}>{sel ? "›" : "·"}</Text>
               )}
               <Box flexGrow={1} flexShrink={1} minWidth={0}>
-                <Text
-                  color={sel ? SEL_COLOR : "white"}
-                  bold={s.type === "chat"}
-                  wrap="truncate-end"
-                >
-                  {s.label}
-                </Text>
+                {s.type === "code" && s.title && s.prompt ? (
+                  <Text wrap="truncate-end">
+                    <Text color={sel ? SEL_COLOR : "cyan"} bold>
+                      {s.title}
+                    </Text>
+                    <Text color={sel ? SEL_COLOR : "white"}> · {s.prompt}</Text>
+                  </Text>
+                ) : (
+                  <Text
+                    color={sel ? SEL_COLOR : "white"}
+                    bold={s.type === "chat"}
+                    wrap="truncate-end"
+                  >
+                    {s.label}
+                  </Text>
+                )}
               </Box>
               {s.pinned && (
                 <Box flexShrink={0} marginRight={1}>
@@ -1881,7 +1954,17 @@ const App = () => {
           )
         })}
         <Box marginTop={1} paddingX={2}>
-          <Hint pairs={contextHints(displayItems[cursor])} />
+          <Hint
+            pairs={[
+              ...contextHints(displayItems[cursor]),
+              ...(tab === "code"
+                ? ([["n", codeFilter === "named" ? "all" : "named"]] as [
+                    string,
+                    string,
+                  ][])
+                : []),
+            ]}
+          />
         </Box>
       </>
     )
@@ -1921,6 +2004,9 @@ const App = () => {
         ) : (
           <Text dimColor>{search || "search…"}</Text>
         )}
+        {tab === "code" && codeFilter === "named" && (
+          <Text color={SEL_COLOR}>named</Text>
+        )}
       </Box>
       {renderContent()}
     </Box>
@@ -1957,9 +2043,9 @@ const runBanner = async () => {
     c(bright ? `${O}claude sessions${R}` : `${D}claude sessions${R}`, 15)
 
   const frames: Array<[string[], number]> = [
-    [["", "", "", "", "", txt(false)], 150],
-    [["", "", c(`${D}·${R}`, 1), "", "", txt(false)], 120],
-    [["", "", c(`${D}${O}✻${R}`, 1), "", "", txt(false)], 100],
+    [["", "", "", "", "", txt(false)], 60],
+    [["", "", c(`${D}·${R}`, 1), "", "", txt(false)], 50],
+    [["", "", c(`${D}${O}✻${R}`, 1), "", "", txt(false)], 50],
     [
       [
         "",
@@ -1969,7 +2055,7 @@ const runBanner = async () => {
         "",
         txt(false),
       ],
-      70,
+      40,
     ],
     [
       [
@@ -1980,7 +2066,7 @@ const runBanner = async () => {
         "",
         txt(false),
       ],
-      70,
+      40,
     ],
     [
       [
@@ -1991,7 +2077,7 @@ const runBanner = async () => {
         "",
         txt(false),
       ],
-      70,
+      40,
     ],
     [
       [
@@ -2002,25 +2088,12 @@ const runBanner = async () => {
         "",
         txt(true),
       ],
-      90,
+      60,
     ],
-    [
-      [
-        "",
-        c(`${G}· ${O}✦${G} ·${R}`, 5),
-        c(`${O}✦ · ✻ · ✦${R}`, 9),
-        c(`${G}· ${O}✦${G} ·${R}`, 5),
-        "",
-        txt(true),
-      ],
-      130,
-    ],
-    [sparkle(true), 200],
-    [sparkle(false), 180],
-    [sparkle(true), 180],
-    [sparkle(false), 180],
-    [sparkle(true), 180],
-    [sparkle(false), 200],
+    [sparkle(true), 90],
+    [sparkle(false), 80],
+    [sparkle(true), 80],
+    [sparkle(false), 100],
     [
       [
         "",
@@ -2030,15 +2103,15 @@ const runBanner = async () => {
         "",
         c(`${O}claude sessions${R}`, 15),
       ],
-      170,
+      80,
     ],
     [
       ["", "", c(`${O}✻${R}`, 1), "", "", c(`${O}claude sessions${R}`, 15)],
-      160,
+      80,
     ],
     [
       ["", "", c(`${O}✻${R}`, 1), "", "", c(`${O}claude sessions${R}`, 15)],
-      200,
+      100,
     ],
   ]
 
