@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 
 ---
 
+## Unreleased — 2026-06-23
+
+### Highlights
+
+- **Move session — folder browser replaces wizard** — pressing `M` on a session in the Code list now drops you straight into a live filesystem folder browser instead of a three-step wizard. Navigate with `↑↓`, `←` to go up a level, `→` to enter a subfolder, and `Enter` to confirm the destination. Folders that already contain Claude sessions are flagged with a dim `sessions` tag. Any directory is a valid target — it does not need to be an existing session folder. `+ New subfolder here…` and `+ Other path…` cover edge cases the browser cannot reach. The move rewrites the session's `cwd` throughout the conversation history and reconciles `~/.claude.json`, while warning about any embedded path references that are intentionally left untouched to avoid corrupting unrelated path prefixes. ([5f99ab6](https://github.com/kud/claude-sessions-cli/commit/5f99ab653fa4b9848fb6a60f42bbf8f11298c83d))
+
+---
+
 ## [2.3.0] — 2026-06-22
 
 ### Added
@@ -33,24 +41,3 @@ All notable changes to this project are documented here.
 - Session labels are now cleaned more aggressively before display: leading Markdown heading markers (`#`), list bullets (`-`, `*`, `+`), checkbox syntax (`[ ]`/`[x]`), and inline formatting (`*`, `_`, `` ` ``) are all stripped. This means prompts or titles that were authored in Markdown render as clean plain text rather than showing raw syntax.
 - When both a title and a first-prompt are available and they differ, the label is displayed as **title · prompt**, giving you the context of the opening message alongside the session name.
 - Manual label overrides (set via the rename wizard) now clear the stored `title` and `prompt` fields so the override is displayed without the dual-part format.
-
----
-
-## Unreleased — 2026-06-21
-
-### Highlights
-
-- **Move session** — highlight a session in the Code list and press `M` to relocate it. You land straight in a **filesystem folder browser** rooted at the session's parent directory: navigate with `↑↓`, `→` to open a folder, `←` to go up, and `enter` to drop the session there. Any on-disk folder is a valid destination — it does **not** need to already contain a Claude session — and folders that do are flagged with a dim `sessions` tag. `+ New subfolder here…` and `+ Other path…` cover the cases the browser can't. The move rewrites the session's `cwd` on every line, reconciles `~/.claude.json` to keep the index consistent, and warns you about any embedded path references in the conversation history that are deliberately left untouched (rewriting them blindly would corrupt references to unrelated paths sharing the same prefix). ([2b893b8](https://github.com/kud/claude-sessions-cli/commit/2b893b8b334af472c36964cdc1654159bb93b9e4))
-
-### Documentation
-
-- Docs now live on [kud.io/projects](https://kud.io/projects) rather than GitHub Pages. The README has been slimmed to a front-page entry point, with full content (headings, examples, CLI reference) moved to the dedicated docs site. ([e27b7a8](https://github.com/kud/claude-sessions-cli/commit/e27b7a83f563fe9177ff5f30ef9c8586be0631db))
-
-<details>
-<summary>Internal (3 commits)</summary>
-
-- Removed the obsolete GitHub Pages deployment workflow now that docs live on kud.io. ([46f20cc](https://github.com/kud/claude-sessions-cli/commit/46f20cca7d601576bea389ac67e3c6717aa20020))
-- Aligned README shape to the canonical kud-site format. ([2d67365](https://github.com/kud/claude-sessions-cli/commit/2d673654a4d5463b2eaf8916a4f5c387d93ae122))
-- Added emoji decoration to docs headings. ([6c91617](https://github.com/kud/claude-sessions-cli/commit/6c91617c091faf247948f1e2ba13e53860a4d504))
-
-</details>
