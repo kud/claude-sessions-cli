@@ -10,7 +10,7 @@ import {
   readFileSync,
   writeFileSync,
 } from "fs"
-import { join } from "path"
+import { join, dirname } from "path"
 import { spawnSync, execSync } from "child_process"
 import { homedir } from "os"
 import { randomUUID } from "crypto"
@@ -859,8 +859,6 @@ const App = () => {
     | "confirm-delete-all"
     | "clean-confirm"
     | "preview-claude-md"
-    | "move-folder"
-    | "move-session"
     | "move-dest"
     | "move-dest-input"
     | "move-confirm"
@@ -885,13 +883,13 @@ const App = () => {
   const [scrollOffset, setScrollOffset] = useState(0)
   const [codeFilter, setCodeFilter] = useState<CodeFilter>("all")
   const [wizCursor, setWizCursor] = useState(0)
-  const [moveFromDir, setMoveFromDir] = useState<string | null>(null)
   const [moveSessionSel, setMoveSessionSel] = useState<Session | null>(null)
   const [moveToDir, setMoveToDir] = useState<string | null>(null)
   const [moveDestKind, setMoveDestKind] = useState<"new-subfolder" | "other">(
     "new-subfolder",
   )
   const [moveDestInput, setMoveDestInput] = useState("")
+  const [browseDir, setBrowseDir] = useState<string>(HOME)
   const [moveAnalysis, setMoveAnalysis] = useState<{
     lineCount: number
     embeddedRefs: number
@@ -957,20 +955,16 @@ const App = () => {
     [sessions],
   )
 
-  const moveSessionsList = useMemo(
-    () =>
-      sessions && moveFromDir
-        ? sessions.filter(
-            (s) => s.type === "code" && s.dir === moveFromDir && s.sessionId,
-          )
-        : [],
-    [sessions, moveFromDir],
-  )
-
-  const moveDestFolders = useMemo(
-    () => moveFolders.filter((d) => d !== moveFromDir),
-    [moveFolders, moveFromDir],
-  )
+  const destBrowseFolders = useMemo(() => {
+    try {
+      return readdirSync(browseDir, { withFileTypes: true })
+        .filter((e) => e.isDirectory() && !e.name.startsWith("."))
+        .map((e) => join(browseDir, e.name))
+        .sort((a, b) => a.localeCompare(b))
+    } catch {
+      return []
+    }
+  }, [browseDir])
 
   useEffect(() => {
     if (cursor < scrollOffset) setScrollOffset(cursor)
@@ -1136,12 +1130,19 @@ const App = () => {
         findCleanItems().then(setCleanItems)
       }
       if (input === "M") {
-        setMoveFromDir(null)
-        setMoveSessionSel(null)
-        setMoveToDir(null)
-        setMoveAnalysis(null)
-        setWizCursor(0)
-        setMode("move-folder")
+        const item = displayItems[cursor]
+        if (
+          item?.kind === "session" &&
+          item.session.type === "code" &&
+          item.session.sessionId
+        ) {
+          setMoveSessionSel(item.session)
+          setBrowseDir(dirname(item.session.dir))
+          setMoveToDir(null)
+          setMoveAnalysis(null)
+          setWizCursor(0)
+          setMode("move-dest")
+        }
       }
       if (input === "q" || key.escape) exit()
     },
@@ -1250,57 +1251,45 @@ const App = () => {
 
   useInput(
     (_, key) => {
-      const length =
-        mode === "move-folder"
-          ? moveFolders.length
-          : mode === "move-session"
-            ? moveSessionsList.length
-            : moveDestFolders.length + 2
+      const hasParent = dirname(browseDir) !== browseDir
+      const parentOffset = hasParent ? 1 : 0
+      const length = parentOffset + destBrowseFolders.length + 2
       if (key.upArrow) setWizCursor((c) => Math.max(0, c - 1))
       if (key.downArrow) setWizCursor((c) => Math.min(length - 1, c + 1))
-      if (key.escape) {
-        if (mode === "move-folder") setMode("list")
-        else if (mode === "move-session") {
-          setMode("move-folder")
-          setWizCursor(0)
-        } else {
-          setMode("move-session")
+      if (key.escape) setMode("list")
+      if (key.leftArrow && hasParent) {
+        setBrowseDir(dirname(browseDir))
+        setWizCursor(0)
+        return
+      }
+      if (key.rightArrow) {
+        const folder = destBrowseFolders[wizCursor - parentOffset]
+        if (wizCursor >= parentOffset && folder) {
+          setBrowseDir(folder)
           setWizCursor(0)
         }
+        return
       }
       if (key.return) {
-        if (mode === "move-folder") {
-          const dir = moveFolders[wizCursor]
-          if (!dir) return
-          setMoveFromDir(dir)
+        if (hasParent && wizCursor === 0) {
+          setBrowseDir(dirname(browseDir))
           setWizCursor(0)
-          setMode("move-session")
-        } else if (mode === "move-session") {
-          const session = moveSessionsList[wizCursor]
-          if (!session) return
-          setMoveSessionSel(session)
-          setWizCursor(0)
-          setMode("move-dest")
-        } else if (mode === "move-dest") {
-          if (wizCursor < moveDestFolders.length) {
-            const dir = moveDestFolders[wizCursor]
-            if (dir) goToMoveConfirm(dir)
-          } else {
-            setMoveDestKind(
-              wizCursor === moveDestFolders.length ? "new-subfolder" : "other",
-            )
-            setMoveDestInput("")
-            setMode("move-dest-input")
-          }
+          return
+        }
+        const folderIdx = wizCursor - parentOffset
+        if (folderIdx < destBrowseFolders.length) {
+          const dir = destBrowseFolders[folderIdx]
+          if (dir) goToMoveConfirm(dir)
+        } else {
+          setMoveDestKind(
+            folderIdx === destBrowseFolders.length ? "new-subfolder" : "other",
+          )
+          setMoveDestInput("")
+          setMode("move-dest-input")
         }
       }
     },
-    {
-      isActive:
-        mode === "move-folder" ||
-        mode === "move-session" ||
-        mode === "move-dest",
-    },
+    { isActive: mode === "move-dest" },
   )
 
   useInput(
@@ -1331,7 +1320,6 @@ const App = () => {
     (_, key) => {
       if (key.return || key.escape) {
         setMoveResult(null)
-        setMoveFromDir(null)
         setMoveSessionSel(null)
         setMoveToDir(null)
         setMoveAnalysis(null)
@@ -1571,10 +1559,10 @@ const App = () => {
       )
     }
 
-    const moveHeader = (step: number, subtitle?: string) => (
+    const moveHeader = (subtitle?: string) => (
       <>
         <Text bold>
-          Move session <Text dimColor>· step {step}/3</Text>
+          Move session <Text dimColor>· choose destination</Text>
         </Text>
         {subtitle && (
           <Text dimColor wrap="truncate-end">
@@ -1584,110 +1572,55 @@ const App = () => {
       </>
     )
 
-    if (mode === "move-folder") {
-      const { start, items } = windowed(moveFolders, wizCursor, listHeight)
-      return (
-        <Box flexDirection="column" paddingX={2}>
-          {moveHeader(1, "Pick the folder to move a session from")}
-          <Box flexDirection="column" marginTop={1}>
-            {moveFolders.length === 0 && (
-              <Text dimColor>no code sessions found</Text>
-            )}
-            {items.map((dir, vi) => {
-              const i = start + vi
-              const sel = i === wizCursor
-              return (
-                <Box key={dir} gap={1}>
-                  <Text color={sel ? "green" : "gray"}>{sel ? "›" : " "}</Text>
-                  <Text color={sel ? SEL_COLOR : "green"}>{ICON_CODE}</Text>
-                  <Box flexGrow={1} flexShrink={1} minWidth={0}>
-                    <Text color={sel ? SEL_COLOR : "white"} wrap="truncate-end">
-                      {dir.replace(HOME, "~")}
-                    </Text>
-                  </Box>
-                </Box>
-              )
-            })}
-          </Box>
-          <Box marginTop={1}>
-            <Hint
-              pairs={[
-                ["↑↓", "nav"],
-                ["enter", "select"],
-                ["esc", "cancel"],
-              ]}
-            />
-          </Box>
-        </Box>
-      )
-    }
-
-    if (mode === "move-session") {
-      const { start, items } = windowed(moveSessionsList, wizCursor, listHeight)
-      return (
-        <Box flexDirection="column" paddingX={2}>
-          {moveHeader(2, moveFromDir?.replace(HOME, "~"))}
-          <Box flexDirection="column" marginTop={1}>
-            {items.map((s, vi) => {
-              const i = start + vi
-              const sel = i === wizCursor
-              return (
-                <Box key={s.sessionId} gap={1}>
-                  <Text color={sel ? "green" : "gray"}>{sel ? "›" : "·"}</Text>
-                  <Box flexGrow={1} flexShrink={1} minWidth={0}>
-                    <Text color={sel ? SEL_COLOR : "white"} wrap="truncate-end">
-                      {s.label}
-                    </Text>
-                  </Box>
-                  <Box flexShrink={0} minWidth={9} justifyContent="flex-end">
-                    <Text dimColor>{s.ago}</Text>
-                  </Box>
-                </Box>
-              )
-            })}
-          </Box>
-          <Box marginTop={1}>
-            <Hint
-              pairs={[
-                ["↑↓", "nav"],
-                ["enter", "select"],
-                ["esc", "back"],
-              ]}
-            />
-          </Box>
-        </Box>
-      )
-    }
-
     if (mode === "move-dest") {
-      const specials = [
-        `+ New subfolder of ${moveFromDir?.replace(HOME, "~")}`,
-        "+ Other path…",
+      const hasParent = dirname(browseDir) !== browseDir
+      const sessionDirs = new Set(moveFolders)
+      const rows = [
+        ...(hasParent ? [{ kind: "up" as const }] : []),
+        ...destBrowseFolders.map((dir) => ({ kind: "folder" as const, dir })),
+        { kind: "new" as const },
+        { kind: "other" as const },
       ]
-      const all = [
-        ...moveDestFolders.map((d) => d.replace(HOME, "~")),
-        ...specials,
-      ]
-      const { start, items } = windowed(all, wizCursor, listHeight)
+      const { start, items } = windowed(rows, wizCursor, listHeight)
       return (
         <Box flexDirection="column" paddingX={2}>
-          {moveHeader(3, moveSessionSel?.label)}
+          {moveHeader(moveSessionSel?.label)}
+          <Text dimColor>in {browseDir.replace(HOME, "~")}</Text>
           <Box flexDirection="column" marginTop={1}>
-            {items.map((labelText, vi) => {
+            {items.map((row, vi) => {
               const i = start + vi
               const sel = i === wizCursor
-              const isSpecial = i >= moveDestFolders.length
+              const isSpecial = row.kind === "new" || row.kind === "other"
+              const label =
+                row.kind === "up"
+                  ? "../"
+                  : row.kind === "folder"
+                    ? `${kebabLabel(row.dir)}/`
+                    : row.kind === "new"
+                      ? "+ New subfolder here…"
+                      : "+ Other path…"
+              const hasSessions =
+                row.kind === "folder" && sessionDirs.has(row.dir)
               return (
-                <Box key={labelText} gap={1}>
+                <Box key={i} gap={1}>
                   <Text color={sel ? "green" : "gray"}>{sel ? "›" : " "}</Text>
                   <Box flexGrow={1} flexShrink={1} minWidth={0}>
                     <Text
-                      color={sel ? SEL_COLOR : isSpecial ? "cyan" : "white"}
+                      color={
+                        sel
+                          ? SEL_COLOR
+                          : isSpecial
+                            ? "cyan"
+                            : row.kind === "up"
+                              ? "gray"
+                              : "white"
+                      }
                       wrap="truncate-end"
                     >
-                      {labelText}
+                      {label}
                     </Text>
                   </Box>
+                  {hasSessions && <Text dimColor>sessions</Text>}
                 </Box>
               )
             })}
@@ -1696,6 +1629,8 @@ const App = () => {
             <Hint
               pairs={[
                 ["↑↓", "nav"],
+                ["→", "open"],
+                ["←", "up"],
                 ["enter", "select"],
                 ["esc", "back"],
               ]}
@@ -1709,10 +1644,10 @@ const App = () => {
       const isSub = moveDestKind === "new-subfolder"
       return (
         <Box flexDirection="column" paddingX={2}>
-          {moveHeader(3)}
+          {moveHeader()}
           <Text dimColor>
             {isSub
-              ? `New subfolder of ${moveFromDir?.replace(HOME, "~")} (kebab-case)`
+              ? `New subfolder of ${browseDir.replace(HOME, "~")} (kebab-case)`
               : "Destination path (absolute, ~ allowed)"}
           </Text>
           <Box marginTop={1} gap={1}>
@@ -1722,7 +1657,7 @@ const App = () => {
               onChange={setMoveDestInput}
               onSubmit={(val) => {
                 const trimmed = val.trim()
-                if (!trimmed || !moveFromDir) {
+                if (!trimmed) {
                   setMode("move-dest")
                   return
                 }
@@ -1732,7 +1667,7 @@ const App = () => {
                     setMode("move-dest")
                     return
                   }
-                  goToMoveConfirm(join(moveFromDir, slug))
+                  goToMoveConfirm(join(browseDir, slug))
                 } else {
                   const toDir = trimmed.replace(/^~(?=$|\/)/, HOME)
                   if (!toDir.startsWith("/")) {
@@ -2105,10 +2040,7 @@ const runBanner = async () => {
       ],
       80,
     ],
-    [
-      ["", "", c(`${O}✻${R}`, 1), "", "", c(`${O}claude sessions${R}`, 15)],
-      80,
-    ],
+    [["", "", c(`${O}✻${R}`, 1), "", "", c(`${O}claude sessions${R}`, 15)], 80],
     [
       ["", "", c(`${O}✻${R}`, 1), "", "", c(`${O}claude sessions${R}`, 15)],
       100,
@@ -2158,7 +2090,8 @@ if (process.argv[2] === "clean") {
     // ~/Projects/robot-butler — smart home chaos
     {
       dir: "/Users/hal/Projects/robot-butler",
-      label: "robot-butler — make my coffee maker send me passive-aggressive slack messages",
+      label:
+        "robot-butler — make my coffee maker send me passive-aggressive slack messages",
       title: "robot-butler",
       prompt: "make my coffee maker send me passive-aggressive slack messages",
       path: "~/Projects/robot-butler",

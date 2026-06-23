@@ -40,7 +40,7 @@ All notable changes to this project are documented here.
 
 ### Highlights
 
-- **Move session wizard** — press `M` in the session list to interactively relocate a Claude session to a different project folder. The three-step wizard rewrites the session's working directory on disk, reconciles `~/.claude.json` to keep the index consistent, and warns you if the session content contains embedded path references that may still point to the old location. ([2b893b8](https://github.com/kud/claude-sessions-cli/commit/2b893b8b334af472c36964cdc1654159bb93b9e4))
+- **Move session** — highlight a session in the Code list and press `M` to relocate it. You land straight in a **filesystem folder browser** rooted at the session's parent directory: navigate with `↑↓`, `→` to open a folder, `←` to go up, and `enter` to drop the session there. Any on-disk folder is a valid destination — it does **not** need to already contain a Claude session — and folders that do are flagged with a dim `sessions` tag. `+ New subfolder here…` and `+ Other path…` cover the cases the browser can't. The move rewrites the session's `cwd` on every line, reconciles `~/.claude.json` to keep the index consistent, and warns you about any embedded path references in the conversation history that are deliberately left untouched (rewriting them blindly would corrupt references to unrelated paths sharing the same prefix). ([2b893b8](https://github.com/kud/claude-sessions-cli/commit/2b893b8b334af472c36964cdc1654159bb93b9e4))
 
 ### Documentation
 
