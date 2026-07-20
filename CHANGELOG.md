@@ -4,7 +4,24 @@ All notable changes to this project are documented here.
 
 ---
 
-## Unreleased — 2026-06-23
+## Unreleased — 2026-07-20
+
+### Highlights
+
+- Session browsing and resuming now follow Claude Code's own `CLAUDE_CONFIG_DIR` convention, so the tool works with whichever profile you're actually running in instead of always reading the default `~/.claude/projects` — resuming a session lands you back in that same profile rather than the default one. ([7fdd383](https://github.com/kud/claude-sessions-cli/commit/7fdd383e1bf6cfd8c1605acb35e6d7bbb67c79ff))
+
+### Fixes
+
+- Fixed a leak where chats, labels, pins, and tags from every profile were listed together regardless of which profile was active — this state is now scoped per profile, matching the session data itself. ([7fdd383](https://github.com/kud/claude-sessions-cli/commit/7fdd383e1bf6cfd8c1605acb35e6d7bbb67c79ff))
+- Unrecognised CLI flags are now rejected with an error instead of being silently swallowed and running the tool against the wrong data with no warning. ([7fdd383](https://github.com/kud/claude-sessions-cli/commit/7fdd383e1bf6cfd8c1605acb35e6d7bbb67c79ff))
+
+### Internal
+
+- Consolidated the README's preview screenshots into a single hero image and removed the unused `next`-tag publish workflow. ([353bbdc](https://github.com/kud/claude-sessions-cli/commit/353bbdc5fb17b87f8f3d312dd04f371738726fa5), [64d5c93](https://github.com/kud/claude-sessions-cli/commit/64d5c9347f88bdea6ca64c737652def904cafd4e))
+
+---
+
+## [2.4.0] — 2026-06-23
 
 ### Highlights
 
