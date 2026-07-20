@@ -10,15 +10,45 @@ import {
   readFileSync,
   writeFileSync,
 } from "fs"
-import { join, dirname } from "path"
+import { basename, join, dirname } from "path"
 import { spawnSync, execSync } from "child_process"
 import { homedir } from "os"
 import { randomUUID } from "crypto"
 
 const HOME = homedir()
-const CLAUDE_PROJECTS = join(HOME, ".claude", "projects")
-const CLAUDE_JSON = join(HOME, ".claude.json")
-const CLAUDE_SESSIONS_DIR = join(HOME, ".claude-sessions")
+const DEFAULT_CONFIG_DIR = join(HOME, ".claude")
+
+const KNOWN_FLAGS = new Set(["--no-banner"])
+
+const unknownFlag = process.argv
+  .slice(2)
+  .find((arg) => arg.startsWith("-") && !KNOWN_FLAGS.has(arg))
+if (unknownFlag) {
+  console.error(`Unknown option: ${unknownFlag}`)
+  process.exit(1)
+}
+
+// Follows Claude Code's own CLAUDE_CONFIG_DIR, so whichever profile the caller
+// is in, we browse that profile's sessions. spawnSync inherits our env, so the
+// resumed session lands in the same profile too.
+const CONFIG_DIR = process.env.CLAUDE_CONFIG_DIR || DEFAULT_CONFIG_DIR
+const IS_DEFAULT_PROFILE = CONFIG_DIR === DEFAULT_CONFIG_DIR
+
+const CLAUDE_PROJECTS = join(CONFIG_DIR, "projects")
+// The default profile keeps its config at ~/.claude.json, NOT inside the config
+// dir — ~/.claude/.claude.json also exists but is an empty decoy. Every other
+// profile does keep it inside. Hence the split rather than one join().
+const CLAUDE_JSON = IS_DEFAULT_PROFILE
+  ? join(HOME, ".claude.json")
+  : join(CONFIG_DIR, ".claude.json")
+
+// Our own state (chats, labels, pins, tags) is scoped per profile too, so one
+// profile's chats never surface in another's list.
+const PROFILE_SUFFIX = basename(CONFIG_DIR).replace(/^\.claude-?/, "")
+const CLAUDE_SESSIONS_DIR = join(
+  HOME,
+  PROFILE_SUFFIX ? `.claude-sessions-${PROFILE_SUFFIX}` : ".claude-sessions",
+)
 const CHATS_DIR = join(CLAUDE_SESSIONS_DIR, "chats")
 const SESSION_LABELS_FILE = join(CLAUDE_SESSIONS_DIR, "session-labels.json")
 const SESSION_PINS_FILE = join(CLAUDE_SESSIONS_DIR, "session-pins.json")
@@ -436,7 +466,7 @@ const findCleanItems = async (): Promise<CleanItem[]> => {
         if (!knownDirNames.has(dir)) {
           const fullPath = join(CLAUDE_PROJECTS, dir)
           items.push({
-            label: `~/.claude/projects/${dir}`,
+            label: fullPath.replace(HOME, "~"),
             reason: "orphaned history",
             execute: () => execSync(`trash "${fullPath}"`),
           })
@@ -1703,8 +1733,8 @@ const App = () => {
           </Box>
           <Box flexDirection="column" marginTop={1}>
             <Text dimColor>
-              rewrites cwd on {moveAnalysis?.lineCount ?? 0} lines · updates
-              ~/.claude.json
+              rewrites cwd on {moveAnalysis?.lineCount ?? 0} lines · updates{" "}
+              {CLAUDE_JSON.replace(HOME, "~")}
             </Text>
             {refs > 0 && (
               <Text color="yellow">
