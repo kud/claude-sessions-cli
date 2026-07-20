@@ -1,6 +1,6 @@
 {
   "name": "@kud/claude-sessions-cli",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "description": "TUI session manager for Claude Code",
   "homepage": "https://kud.io/projects/claude-sessions-cli",
   "repository": {
