@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import React, { useState, useEffect, useMemo } from "react"
 import { render, Box, Text, useInput, useApp, useStdout } from "ink"
+import { useAppKeys } from "@kud/ink-ui"
 import TextInput from "ink-text-input"
 import { readdir, stat } from "fs/promises"
 import {
@@ -1174,10 +1175,12 @@ const App = () => {
           setMode("move-dest")
         }
       }
-      if (input === "q" || key.escape) exit()
     },
     { isActive: mode === "list" && !!sessions },
   )
+  // `q` quits from the list; every other mode is a layer with its own esc
+  // back to the list, and at the list esc does nothing — quitting has a key.
+  useAppKeys({ isActive: mode === "list" && !!sessions, onQuit: exit })
 
   useInput(
     (input, key) => {
