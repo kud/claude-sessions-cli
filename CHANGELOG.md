@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 
 ---
 
+## 2.6.0 — 2026-09-14
+
+### Highlights
+
+- **`esc` no longer quits from the list.** `q` quits; `esc` goes back one level — every mode returns to the list, and at the list it does nothing. Built on `@kud/ink-ui` 0.27's `useAppKeys`. ([441d88a](https://github.com/kud/claude-sessions-cli/commit/441d88a339c6cbe46726a87801cd42959ac5c167))
+
+---
+
 ## Unreleased — 2026-07-20
 
 ### Highlights
