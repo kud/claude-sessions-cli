@@ -1,7 +1,12 @@
 #!/usr/bin/env node
-import React, { useState, useEffect, useMemo } from "react"
+import React, { useState, useEffect, useMemo, useRef } from "react"
 import { render, Box, Text, useInput, useApp, useStdout } from "ink"
-import { useAppKeys } from "@kud/ink-ui"
+import {
+  FilterBar,
+  useAppKeys,
+  useFilterMode,
+  useListCursor,
+} from "@kud/ink-ui"
 import TextInput from "ink-text-input"
 import { readdir, stat } from "fs/promises"
 import {
@@ -675,22 +680,16 @@ const contextHints = (item: DisplayItem | undefined): [string, string][] => {
     ["↑↓", "nav"],
     ["←→", "tab"],
   ]
-  if (item?.kind === "new")
-    return [...nav, ["enter", "new chat"], ["/", "search"], ["q", "quit"]]
+  if (item?.kind === "new") return [...nav, ["enter", "new chat"]]
   if (item?.kind === "header")
     return [
       ...nav,
       ["enter", "open"],
       ["space", item.expanded ? "collapse" : "expand"],
       ["d", "delete all"],
-      ["q", "quit"],
     ]
   if (item?.kind === "tag-header")
-    return [
-      ...nav,
-      ["space", item.expanded ? "collapse" : "expand"],
-      ["q", "quit"],
-    ]
+    return [...nav, ["space", item.expanded ? "collapse" : "expand"]]
   if (item?.kind === "session") {
     const s = item.session
     const pairs: [string, string][] = [
@@ -706,10 +705,9 @@ const contextHints = (item: DisplayItem | undefined): [string, string][] => {
       pairs.push(["M", "move"])
     }
     if (s.hasClaudeMd) pairs.push(["m", "md"])
-    pairs.push(["q", "quit"])
     return pairs
   }
-  return [...nav, ["/", "search"], ["q", "quit"]]
+  return nav
 }
 
 const Hint = ({ pairs }: { pairs: [string, string][] }) => (
@@ -879,10 +877,8 @@ const App = () => {
   const [sessions, setSessions] = useState<Session[] | null>(null)
   const [loadingIndex, setLoadingIndex] = useState(0)
   const [tab, setTab] = useState<Tab>(savedState.tab)
-  const [cursor, setCursor] = useState(savedState.cursor)
   const [mode, setMode] = useState<
     | "list"
-    | "search"
     | "new"
     | "rename"
     | "tag"
@@ -897,7 +893,6 @@ const App = () => {
   >("list")
   const [newName, setNewName] = useState("")
   const [renameValue, setRenameValue] = useState("")
-  const [search, setSearch] = useState("")
   const [cleanItems, setCleanItems] = useState<CleanItem[] | null>(null)
   const [deleteAllTarget, setDeleteAllTarget] = useState<{
     dir: string
@@ -959,6 +954,16 @@ const App = () => {
   const CHROME_ROWS = 10
   const listHeight = Math.max(1, (stdout.rows ?? 24) - CHROME_ROWS)
 
+  const isListActive = mode === "list" && !!sessions
+  // The filter needs the cursor to reset on a new term, but the cursor needs
+  // the filtered length, so the reset reaches forward through a ref.
+  const resetCursor = useRef(() => {})
+  const filter = useFilterMode({
+    isActive: isListActive,
+    onChange: () => resetCursor.current(),
+  })
+  const search = filter.term ?? ""
+
   const displayItems = useMemo(
     () =>
       sessions
@@ -973,6 +978,14 @@ const App = () => {
         : [],
     [sessions, tab, search, expandedProjects, expandedTags, codeFilter],
   )
+
+  // ↑↓ always walk the list; j/k only when they are not letters in the term.
+  const { cursor, setCursor } = useListCursor(displayItems.length, {
+    initial: savedState.cursor,
+    vimKeys: !filter.typing,
+    isActive: isListActive,
+  })
+  resetCursor.current = () => setCursor(0)
 
   const moveFolders = useMemo(
     () =>
@@ -1007,9 +1020,6 @@ const App = () => {
     setScrollOffset(0)
   }, [tab, search])
 
-  const moveCursor = (dir: 1 | -1) =>
-    setCursor((c) => Math.max(0, Math.min(displayItems.length - 1, c + dir)))
-
   const toggleExpand = (dir: string) =>
     setExpandedProjects((prev) => {
       if (prev.has(dir)) return new Set()
@@ -1029,7 +1039,7 @@ const App = () => {
   const cycleTab = (dir: 1 | -1) => {
     const next = TABS[(TABS.indexOf(tab) + dir + TABS.length) % TABS.length]!
     setTab(next)
-    setSearch("")
+    filter.clear()
     setCodeFilter("all")
   }
 
@@ -1058,16 +1068,11 @@ const App = () => {
 
   useInput(
     (input, key) => {
-      if (key.upArrow) moveCursor(-1)
-      if (key.downArrow) moveCursor(1)
+      // While typing, every key belongs to the term: the filter hook has it.
+      if (filter.typing) return
       if (key.leftArrow) cycleTab(-1)
       if (key.rightArrow) cycleTab(1)
       if (key.tab) cycleTab(1)
-      if (input === "/") {
-        setMode("search")
-        setSearch("")
-        setCursor(0)
-      }
 
       if (key.return) {
         const item = displayItems[cursor]
@@ -1176,35 +1181,16 @@ const App = () => {
         }
       }
     },
-    { isActive: mode === "list" && !!sessions },
+    { isActive: isListActive },
   )
   // `q` quits from the list; every other mode is a layer with its own esc
-  // back to the list, and at the list esc does nothing — quitting has a key.
-  useAppKeys({ isActive: mode === "list" && !!sessions, onQuit: exit })
-
-  useInput(
-    (input, key) => {
-      if (key.upArrow) moveCursor(-1)
-      if (key.downArrow) moveCursor(1)
-      if (key.return) {
-        const item = displayItems[cursor]
-        if (!item) return
-        if (item.kind === "new") {
-          setSearch("")
-          setMode("new")
-          setNewName("")
-        } else if (item.kind === "session") {
-          doOpen(item.session)
-        }
-      }
-      if (key.escape) {
-        setSearch("")
-        setMode("list")
-        setCursor(0)
-      }
-    },
-    { isActive: mode === "search" && !!sessions },
-  )
+  // back to the list. At the list a kept filter is the last layer to peel,
+  // and with none left esc does nothing — quitting has a key.
+  useAppKeys({
+    isActive: isListActive && !filter.typing,
+    onQuit: exit,
+    onBack: () => (filter.active ? (filter.clear(), true) : false),
+  })
 
   useInput(
     (input, key) => {
@@ -1364,9 +1350,8 @@ const App = () => {
     { isActive: mode === "move-done" },
   )
 
-  const isSearching = mode === "search"
   const visibleItems =
-    mode === "list" || mode === "search"
+    mode === "list"
       ? displayItems.slice(scrollOffset, scrollOffset + listHeight)
       : []
 
@@ -1923,15 +1908,21 @@ const App = () => {
         })}
         <Box marginTop={1} paddingX={2}>
           <Hint
-            pairs={[
-              ...contextHints(displayItems[cursor]),
-              ...(tab === "code"
-                ? ([["n", codeFilter === "named" ? "all" : "named"]] as [
-                    string,
-                    string,
-                  ][])
-                : []),
-            ]}
+            pairs={
+              filter.typing
+                ? filter.hints
+                : [
+                    ...contextHints(displayItems[cursor]),
+                    ...(tab === "code"
+                      ? ([["n", codeFilter === "named" ? "all" : "named"]] as [
+                          string,
+                          string,
+                        ][])
+                      : []),
+                    ...filter.hints,
+                    ["q", "quit"],
+                  ]
+            }
           />
         </Box>
       </>
@@ -1959,18 +1950,14 @@ const App = () => {
         ))}
       </Box>
       <Box paddingX={2} marginBottom={1} gap={1}>
-        <Text dimColor>/</Text>
-        {isSearching ? (
-          <TextInput
-            value={search}
-            onChange={(v) => {
-              setSearch(v)
-              setCursor(0)
-            }}
-            onSubmit={() => {}}
+        {filter.active ? (
+          <FilterBar
+            term={filter.term}
+            typing={filter.typing}
+            matches={displayItems.filter((i) => i.kind !== "new").length}
           />
         ) : (
-          <Text dimColor>{search || "search…"}</Text>
+          <Text dimColor>/ search…</Text>
         )}
         {tab === "code" && codeFilter === "named" && (
           <Text color={SEL_COLOR}>named</Text>
