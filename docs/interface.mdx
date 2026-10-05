@@ -33,25 +33,28 @@ You never have to remember which flag a session needs.
 
 ## ⌨️ Key bindings
 
-| Key         | Context         | Action                                     |
-| ----------- | --------------- | ------------------------------------------ |
-| `↑` `↓`     | Anywhere        | Navigate the list                          |
-| `←` `→`     | Anywhere        | Switch tabs                                |
-| `tab`       | Anywhere        | Cycle to the next tab                      |
-| `enter`     | Session / group | Open or resume the session in Claude Code  |
-| `space`     | Group header    | Expand or collapse the project / tag group |
-| `d`         | Session         | Delete session (with confirmation)         |
-| `d`         | Project header  | Delete all sessions for that project       |
-| `r`         | Code session    | Rename the session label                   |
-| `p`         | Chat session    | Pin or unpin (★) the session               |
-| `t`         | Chat session    | Set or remove a `#tag` for the session     |
-| `m`         | Chat session    | Preview the session's `CLAUDE.md` inline   |
-| `f`         | Chat session    | Open the session folder in Finder          |
-| `/`         | List            | Enter search mode — filter by name or path |
-| `C`         | List            | Open clean mode                            |
-| `q` / `esc` | Anywhere        | Quit                                       |
+| Key     | Context         | Action                                     |
+| ------- | --------------- | ------------------------------------------ |
+| `↑` `↓` | Anywhere        | Navigate the list                          |
+| `←` `→` | Anywhere        | Switch tabs                                |
+| `tab`   | Anywhere        | Cycle to the next tab                      |
+| `enter` | Session / group | Open or resume the session in Claude Code  |
+| `space` | Group header    | Expand or collapse the project / tag group |
+| `d`     | Session         | Delete session (with confirmation)         |
+| `d`     | Project header  | Delete all sessions for that project       |
+| `r`     | Code session    | Rename the session label                   |
+| `p`     | Chat session    | Pin or unpin (★) the session               |
+| `t`     | Chat session    | Set or remove a `#tag` for the session     |
+| `m`     | Chat session    | Preview the session's `CLAUDE.md` inline   |
+| `f`     | Chat session    | Open the session folder in Finder          |
+| `/`     | List            | Enter search mode — filter by name or path |
+| `C`     | List            | Open clean mode                            |
+| `esc`   | List            | Clear a kept search filter                 |
+| `q`     | List            | Quit                                       |
 
 ## 🔍 Live search
 
 Press `/` to enter search mode and filter the visible sessions by name or path
-as you type. Press `esc` to clear the filter and return to the full list.
+as you type. `enter` or `esc` keeps the filter and hands the keys back to the
+list; `ctrl+u` clears it while typing, and `esc` from the list clears a kept
+filter, so two presses of `esc` return to the full list from anywhere.
