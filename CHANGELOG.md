@@ -4,6 +4,20 @@ All notable changes to this project are documented here.
 
 ---
 
+## 2.7.0 — 2026-10-05
+
+### Highlights
+
+- **Live search is easier to leave and clear.** `esc` exits the field but keeps your filter, `ctrl+u` clears it, and `esc` twice clears it from anywhere. ([8af8ebb](https://github.com/kud/claude-sessions-cli/commit/8af8ebb9c7c40a630dc733673e35e1b8ba4822d4))
+- **Search and list navigation now use a dedicated filter bar and vim-style cursor keys**, with filter hints shown in context. ([c562b7d](https://github.com/kud/claude-sessions-cli/commit/c562b7d5cee092ec26c920d3a50485c781b33665))
+- **Colours now come from `@kud/ink-ui`'s new palette**, via the bump to 0.36.0. ([8af8ebb](https://github.com/kud/claude-sessions-cli/commit/8af8ebb9c7c40a630dc733673e35e1b8ba4822d4))
+
+### Documentation
+
+- The keys table now says `esc` no longer quits from anywhere, and lists each key's scope correctly. ([8af8ebb](https://github.com/kud/claude-sessions-cli/commit/8af8ebb9c7c40a630dc733673e35e1b8ba4822d4))
+
+---
+
 ## 2.6.0 — 2026-09-14
 
 ### Highlights
