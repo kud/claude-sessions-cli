@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import React, { useState, useEffect, useMemo, useRef } from "react"
-import { render, Box, Text, useInput, useApp, useStdout } from "ink"
+import { render, Box, Text, useInput, useApp, useWindowSize } from "ink"
 import {
   FilterBar,
   useAppKeys,
@@ -873,7 +873,7 @@ const CleanApp = () => {
 
 const App = () => {
   const { exit } = useApp()
-  const { stdout } = useStdout()
+  const { columns, rows } = useWindowSize()
   const [sessions, setSessions] = useState<Session[] | null>(null)
   const [loadingIndex, setLoadingIndex] = useState(0)
   const [tab, setTab] = useState<Tab>(savedState.tab)
@@ -952,7 +952,7 @@ const App = () => {
   }, [sessions])
 
   const CHROME_ROWS = 10
-  const listHeight = Math.max(1, (stdout.rows ?? 24) - CHROME_ROWS)
+  const listHeight = Math.max(1, (rows ?? 24) - CHROME_ROWS)
 
   const isListActive = mode === "list" && !!sessions
   // The filter needs the cursor to reset on a new term, but the cursor needs
@@ -1930,7 +1930,7 @@ const App = () => {
   }
 
   return (
-    <Box flexDirection="column" paddingY={1} width={stdout.columns}>
+    <Box flexDirection="column" paddingY={1} width={columns}>
       <Box paddingX={2} gap={1} marginBottom={1}>
         <Text color={SEL_COLOR}>✻</Text>
         <Text bold>Claude</Text>
@@ -1971,6 +1971,22 @@ const App = () => {
 mkdirSync(CHATS_DIR, { recursive: true })
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
+
+// Ink's clear-on-narrow erases by logical line count, which under-erases once
+// the old frame's lines wrap at the new width. Inside the alternate screen a
+// full clear is free, so wipe it before Ink repaints.
+const clearScreenOnNarrow = () => {
+  let lastColumns = process.stdout.columns ?? 0
+  const onResize = () => {
+    const columns = process.stdout.columns ?? 0
+    if (columns < lastColumns) process.stdout.write("\x1b[2J\x1b[3J\x1b[H")
+    lastColumns = columns
+  }
+  process.stdout.prependListener("resize", onResize)
+  return () => {
+    process.stdout.off("resize", onResize)
+  }
+}
 
 const runBanner = async () => {
   const cols = process.stdout.columns ?? 80
@@ -2150,8 +2166,10 @@ if (process.argv[2] === "clean") {
   ]
   sessionPreload = Promise.resolve(mockSessions)
   process.stdout.write("\x1b[?1049h\x1b[2J\x1b[H\x1b[?25l")
+  const stopClearOnNarrow = clearScreenOnNarrow()
   const { waitUntilExit } = render(<App />, { exitOnCtrlC: true })
   await waitUntilExit()
+  stopClearOnNarrow()
   process.stdout.write("\x1b[2J\x1b[H\x1b[?1049l\x1b[2J\x1b[H\x1b[?25h")
 } else {
   let firstLaunch = true
@@ -2165,8 +2183,10 @@ if (process.argv[2] === "clean") {
       firstLaunch = false
     }
 
+    const stopClearOnNarrow = clearScreenOnNarrow()
     const { waitUntilExit } = render(<App />, { exitOnCtrlC: true })
     await waitUntilExit()
+    stopClearOnNarrow()
 
     process.stdout.write("\x1b[2J\x1b[H\x1b[?1049l\x1b[2J\x1b[H\x1b[?25h")
 
