@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import React, { useState, useEffect, useMemo, useRef } from "react"
-import { render, Box, Text, useInput, useApp, useStdout } from "ink"
+import { render, Box, Text, useInput, useApp, useWindowSize } from "ink"
 import {
   FilterBar,
   useAppKeys,
@@ -873,7 +873,7 @@ const CleanApp = () => {
 
 const App = () => {
   const { exit } = useApp()
-  const { stdout } = useStdout()
+  const { columns, rows } = useWindowSize()
   const [sessions, setSessions] = useState<Session[] | null>(null)
   const [loadingIndex, setLoadingIndex] = useState(0)
   const [tab, setTab] = useState<Tab>(savedState.tab)
@@ -952,7 +952,7 @@ const App = () => {
   }, [sessions])
 
   const CHROME_ROWS = 10
-  const listHeight = Math.max(1, (stdout.rows ?? 24) - CHROME_ROWS)
+  const listHeight = Math.max(1, rows - CHROME_ROWS)
 
   const isListActive = mode === "list" && !!sessions
   // The filter needs the cursor to reset on a new term, but the cursor needs
@@ -1930,7 +1930,7 @@ const App = () => {
   }
 
   return (
-    <Box flexDirection="column" paddingY={1} width={stdout.columns}>
+    <Box flexDirection="column" paddingY={1} width={columns}>
       <Box paddingX={2} gap={1} marginBottom={1}>
         <Text color={SEL_COLOR}>✻</Text>
         <Text bold>Claude</Text>
